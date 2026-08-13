@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { AppShell } from "@/src/components/app-shell";
@@ -12,7 +13,14 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="zh-CN">
       <body>
-        <AppShell>{children}</AppShell>
+        <AppShell>
+          <nav aria-label="主导航">
+            <Link href="/">我的首页</Link>
+            <Link href="/chapters">18章地图</Link>
+            <Link href="/system">我的系统</Link>
+          </nav>
+          {children}
+        </AppShell>
       </body>
     </html>
   );
