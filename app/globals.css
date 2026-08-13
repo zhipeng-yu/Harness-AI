@@ -17,3 +17,47 @@ main {
   margin: 0 auto;
   padding: 3rem 1.5rem;
 }
+
+.chapter-workspace {
+  display: grid;
+  gap: 2rem;
+}
+
+.progress-stepper {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-stepper li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.progress-stepper span {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.chapter-workspace__content section {
+  margin-block: 2.5rem;
+}
+
+@media (min-width: 900px) {
+  .chapter-workspace {
+    grid-template-columns: 180px minmax(0, 1fr) 240px;
+    align-items: start;
+  }
+
+  .chapter-workspace__summary {
+    position: sticky;
+    top: 1.5rem;
+  }
+}
