@@ -8,11 +8,11 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 const projectRoot = resolve(import.meta.dirname, "..", "..");
+const testTempRoot = join(projectRoot, ".tools", "launcher-tests");
 const startSource = join(projectRoot, "scripts", "Start-Harness.ps1");
 const stopSource = join(projectRoot, "scripts", "Stop-Harness.ps1");
 const temporaryRoots: string[] = [];
@@ -24,103 +24,143 @@ type ScriptResult = Readonly<{
   stderr: string;
 }>;
 
-type LaunchEvent = Readonly<{
-  event: string;
-  arguments?: string[];
+type FixtureOptions = Readonly<{
+  database?: boolean;
+  mode?: "ready" | "delayed" | "exit" | "never";
+  nodeModules?: boolean;
 }>;
 
 type EnvironmentPatch = Readonly<Record<string, string | undefined>>;
 
-function createFixture(options: { nodeModules?: boolean; database?: boolean } = {}) {
-  const root = mkdtempSync(join(tmpdir(), "harness-launcher-"));
+function createFixture({
+  database = false,
+  mode = "ready",
+  nodeModules = true,
+}: FixtureOptions = {}) {
+  mkdirSync(testTempRoot, { recursive: true });
+  const root = mkdtempSync(join(testTempRoot, "project-"));
   temporaryRoots.push(root);
   mkdirSync(join(root, "scripts"));
-  if (existsSync(startSource)) copyFileSync(startSource, join(root, "scripts", "Start-Harness.ps1"));
-  if (existsSync(stopSource)) copyFileSync(stopSource, join(root, "scripts", "Stop-Harness.ps1"));
-  if (options.nodeModules) mkdirSync(join(root, "node_modules"));
-  if (options.database) {
+  mkdirSync(join(root, "bin"));
+  copyFileSync(startSource, join(root, "scripts", "Start-Harness.ps1"));
+  copyFileSync(stopSource, join(root, "scripts", "Stop-Harness.ps1"));
+  const commandLog = join(root, "npm-commands.log");
+  writeFileSync(
+    join(root, "bin", "npm.cmd"),
+    [
+      "@echo off",
+      `echo %1 %2>>\"${commandLog}\"`,
+      "if \"%HARNESS_FIXTURE_FAIL_COMMAND%\"==\"%2\" exit /b 1",
+      "exit /b 0",
+      "",
+    ].join("\r\n"),
+    "utf8",
+  );
+  if (nodeModules) {
+    const nextDir = join(root, "node_modules", "next", "dist", "bin");
+    mkdirSync(nextDir, { recursive: true });
+    writeFileSync(
+      join(nextDir, "next"),
+      [
+        'const fs = require("node:fs");',
+        'const http = require("node:http");',
+        `fs.writeFileSync(${JSON.stringify(join(root, "child-arguments.json"))}, JSON.stringify(process.argv.slice(2)));`,
+        `const mode = ${JSON.stringify(mode)};`,
+        'if (mode === "exit") process.exit(17);',
+        'const server = http.createServer((_request, response) => { response.statusCode = 200; response.end("ready"); });',
+        'const listen = () => server.listen(3000, "127.0.0.1");',
+        'if (mode === "delayed") setTimeout(listen, 700);',
+        'else if (mode === "ready") listen();',
+        'else setInterval(() => {}, 1000);',
+        'process.on("SIGTERM", () => server.close(() => process.exit(0)));',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+  }
+  if (database) {
     mkdirSync(join(root, "data"));
     writeFileSync(join(root, "data", "harness.sqlite"), "existing database");
   }
-  return root;
+  return { root, commandLog };
 }
 
-function runPowerShell(script: string, env: EnvironmentPatch = {}): ScriptResult {
-  const escaped = script.replaceAll("'", "''");
-  const result = spawnSync(
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-Command",
-      `[Console]::OutputEncoding = [Text.Encoding]::UTF8; & '${escaped}'`,
-    ],
-    {
-      encoding: "utf8",
-      env: { ...process.env, ...env },
-      timeout: 15_000,
-    },
-  );
+function powerShellResult(
+  command: string[],
+  env: EnvironmentPatch = {},
+  timeout = 45_000,
+): ScriptResult {
+  const result = spawnSync("powershell.exe", command, {
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+    timeout,
+  });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
-function runStart(root: string, env: EnvironmentPatch = {}) {
-  const logPath = join(root, "launch-events.jsonl");
-  const result = runPowerShell(join(root, "scripts", "Start-Harness.ps1"), {
-    HARNESS_LAUNCHER_TEST: "1",
-    HARNESS_LAUNCHER_TEST_LOG: logPath,
-    HARNESS_LAUNCHER_TEST_NODE_MAJOR: "24",
-    HARNESS_LAUNCHER_TEST_PID: "4242",
-    HARNESS_LAUNCHER_TEST_START_TIME: "2026-08-13T04:05:06.123Z",
-    ...env,
-  });
-  const events = existsSync(logPath)
-    ? readFileSync(logPath, "utf8")
-        .trim()
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as LaunchEvent)
-    : [];
-  return { ...result, events };
+function runScript(
+  path: string,
+  args: string[] = [],
+  env: EnvironmentPatch = {},
+  timeout?: number,
+) {
+  return powerShellResult(
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", path, ...args],
+    env,
+    timeout,
+  );
 }
 
-function startOwnedSleeper() {
-  const child = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 60"],
-    { stdio: "ignore" },
+function fixtureEnvironment(root: string, patch: EnvironmentPatch = {}) {
+  return {
+    PATH: `${join(root, "bin")}${delimiter}${process.env.PATH ?? ""}`,
+    ...patch,
+  };
+}
+
+function runStart(
+  root: string,
+  options: Readonly<{ env?: EnvironmentPatch; timeoutSeconds?: number }> = {},
+) {
+  return runScript(
+    join(root, "scripts", "Start-Harness.ps1"),
+    ["-SkipBrowser", "-ReadinessTimeoutSeconds", String(options.timeoutSeconds ?? 4)],
+    fixtureEnvironment(root, options.env),
   );
-  ownedProcesses.push(child);
-  if (!child.pid) throw new Error("Could not start the test-owned sleeper process");
-  return child;
+}
+
+function commandEvents(path: string) {
+  return existsSync(path)
+    ? readFileSync(path, "utf8").trim().split(/\r?\n/).filter(Boolean)
+    : [];
+}
+
+function processExists(pid: number) {
+  return spawnSync(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", `Get-Process -Id ${pid} -ErrorAction Stop | Out-Null`],
+    { stdio: "ignore" },
+  ).status === 0;
 }
 
 function processStartTime(pid: number) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
-    const result = spawnSync(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('O')`,
-      ],
-      { encoding: "utf8" },
-    );
+    const result = powerShellResult([
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `(Get-Process -Id ${pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('O')`,
+    ]);
     if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
   }
   throw new Error(`Could not inspect test-owned PID ${pid}`);
 }
 
-function processExists(pid: number) {
-  const result = spawnSync(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-Command", `Get-Process -Id ${pid} -ErrorAction Stop | Out-Null`],
-    { stdio: "ignore" },
-  );
-  return result.status === 0;
+function runtimeRecord(root: string) {
+  return JSON.parse(readFileSync(join(root, ".runtime", "server.json"), "utf8")) as {
+    pid: number;
+    startTime: string;
+  };
 }
 
 function writeRuntime(root: string, pid: number, startTime: string) {
@@ -131,214 +171,284 @@ function writeRuntime(root: string, pid: number, startTime: string) {
   return serverFile;
 }
 
+function startOwnedSleeper() {
+  const child = spawn(
+    "powershell.exe",
+    ["-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 60"],
+    { stdio: "ignore" },
+  );
+  if (!child.pid) throw new Error("Could not start test-owned sleeper");
+  ownedProcesses.push(child);
+  return child;
+}
+
+function escapePowerShell(path: string) {
+  return path.replaceAll("'", "''");
+}
+
+function runDotSourcedDriver(root: string, body: string, env: EnvironmentPatch = {}) {
+  const driver = join(root, "driver.ps1");
+  writeFileSync(
+    driver,
+    `. '${escapePowerShell(join(root, "scripts", body.includes("Invoke-HarnessStart") ? "Start-Harness.ps1" : "Stop-Harness.ps1"))}'\n${body}\n`,
+    "utf8",
+  );
+  return runScript(driver, [], fixtureEnvironment(root, env));
+}
+
 afterEach(() => {
+  for (const root of temporaryRoots) {
+    const serverFile = join(root, ".runtime", "server.json");
+    if (existsSync(serverFile) && existsSync(join(root, "child-arguments.json"))) {
+      const record = runtimeRecord(root);
+      if (processExists(record.pid)) {
+        runScript(join(root, "scripts", "Stop-Harness.ps1"));
+      }
+    }
+  }
   for (const child of ownedProcesses.splice(0)) {
     if (child.pid && processExists(child.pid)) child.kill();
   }
-  for (const root of temporaryRoots.splice(0)) {
-    rmSync(root, { recursive: true, force: true });
-  }
+  for (const root of temporaryRoots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
 describe("safe local launcher", () => {
-  it("does no backup, migration, validation, build, or start when localhost port 3000 is occupied", () => {
-    const root = createFixture({ nodeModules: true, database: true });
-    const result = runStart(root, { HARNESS_LAUNCHER_TEST_PORT_OCCUPIED: "1" });
+  it("does not let an inherited HARNESS_LAUNCHER_TEST environment variable bypass production gates", () => {
+    const { root, commandLog } = createFixture({ nodeModules: false });
+    const result = runStart(root, {
+      env: {
+        HARNESS_LAUNCHER_TEST: "1",
+        HARNESS_LAUNCHER_TEST_NODE_MAJOR: "24",
+        HARNESS_LAUNCHER_TEST_PID: "4242",
+      },
+    });
 
     expect(result.status).not.toBe(0);
-    expect(result.events.map((event) => event.event)).toEqual(["port-check"]);
+    expect(`${result.stdout}\n${result.stderr}`).toMatch(/npm\.cmd\s+i\s*nstall/);
+    expect(commandEvents(commandLog)).toEqual([]);
     expect(existsSync(join(root, ".runtime", "server.json"))).toBe(false);
-  });
+  }, 20_000);
 
-  it("backs up an existing database before migration and completes the remaining gates in order", () => {
-    const root = createFixture({ nodeModules: true, database: true });
+  it("detects a wildcard listener before backup or any other project command", async () => {
+    const { root, commandLog } = createFixture({ database: true });
+    const listenerScript = join(root, "wildcard-listener.js");
+    writeFileSync(
+      listenerScript,
+      'require("node:http").createServer((_q,r)=>r.end("occupied")).listen(3000,"0.0.0.0",()=>console.log("ready"));',
+      "utf8",
+    );
+    const listener = spawn(process.execPath, [listenerScript], { stdio: ["ignore", "pipe", "ignore"] });
+    ownedProcesses.push(listener);
+    await new Promise<void>((resolveReady, reject) => {
+      listener.stdout?.setEncoding("utf8").once("data", () => resolveReady());
+      listener.once("exit", (code) => reject(new Error(`listener exited ${code}`)));
+    });
+
+    const result = runStart(root);
+
+    expect(result.status).not.toBe(0);
+    expect(commandEvents(commandLog)).toEqual([]);
+    expect(existsSync(join(root, ".runtime", "server.json"))).toBe(false);
+  }, 20_000);
+
+  it("backs up an existing database before migration, validation, and build", () => {
+    const { root, commandLog } = createFixture({ database: true });
+
     const result = runStart(root);
 
     expect(result.status).toBe(0);
-    expect(result.events.map((event) => event.event)).toEqual([
-      "port-check",
-      "db:backup",
-      "db:migrate",
-      "content:validate",
-      "build",
-      "start",
-      "browser",
+    expect(commandEvents(commandLog)).toEqual([
+      "run db:backup",
+      "run db:migrate",
+      "run content:validate",
+      "run build",
     ]);
-    expect(existsSync(join(root, "backups", "harness-test-verified.sqlite"))).toBe(true);
   });
 
-  it("reports the exact install instruction without running project commands when node_modules is absent", () => {
-    const root = createFixture();
+  it("rejects Node below 24 before project commands", () => {
+    const { root, commandLog } = createFixture();
+    writeFileSync(join(root, "bin", "node.cmd"), "@echo off\r\necho 23\r\n", "utf8");
+
     const result = runStart(root);
 
     expect(result.status).not.toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toContain(
-      "请先在项目目录运行 npm.cmd install。",
-    );
-    expect(result.events).toEqual([]);
+    expect(`${result.stdout}\n${result.stderr}`).toContain("Node.js 24");
+    expect(commandEvents(commandLog)).toEqual([]);
   });
 
-  it("rejects Node versions below 24 before any project side effect", () => {
-    const root = createFixture({ nodeModules: true });
-    const result = runStart(root, { HARNESS_LAUNCHER_TEST_NODE_MAJOR: "23" });
+  it("starts the real child with exact localhost arguments and writes its real identity after HTTP readiness", async () => {
+    const { root } = createFixture();
 
-    expect(result.status).not.toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toContain("需要 Node.js 24 或更高版本。");
-    expect(result.events).toEqual([]);
-  });
-
-  it("passes the exact localhost-only arguments to the child process", () => {
-    const root = createFixture({ nodeModules: true });
     const result = runStart(root);
-    const start = result.events.find((event) => event.event === "start");
+    const record = runtimeRecord(root);
+    const response = await fetch("http://127.0.0.1:3000");
 
-    expect(start?.arguments).toEqual([
-      "node_modules/next/dist/bin/next",
+    expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, "child-arguments.json"), "utf8"))).toEqual([
       "start",
       "--hostname",
       "127.0.0.1",
       "--port",
       "3000",
     ]);
-  });
+    expect(response.status).toBe(200);
+    expect(processExists(record.pid)).toBe(true);
+    expect(Math.abs(Date.parse(processStartTime(record.pid)) - Date.parse(record.startTime))).toBeLessThanOrEqual(1_000);
+  }, 20_000);
 
-  it("writes the launched PID and an ISO UTC start time", () => {
-    const root = createFixture({ nodeModules: true });
+  it("waits for delayed HTTP readiness before returning and writing runtime state", () => {
+    const { root } = createFixture({ mode: "delayed" });
+    const startedAt = Date.now();
+
     const result = runStart(root);
-    const record = JSON.parse(
-      readFileSync(join(root, ".runtime", "server.json"), "utf8"),
-    ) as { pid: number; startTime: string };
 
     expect(result.status).toBe(0);
-    expect(record).toEqual({ pid: 4242, startTime: "2026-08-13T04:05:06.1230000Z" });
-    expect(new Date(record.startTime).toISOString()).toBe("2026-08-13T04:05:06.123Z");
-  });
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(600);
+    expect(existsSync(join(root, ".runtime", "server.json"))).toBe(true);
+  }, 20_000);
 
-  it("leaves no stale runtime state when starting the server fails", () => {
-    const root = createFixture({ nodeModules: true });
-    const result = runStart(root, { HARNESS_LAUNCHER_TEST_FAIL_COMMAND: "start" });
+  it.each([
+    ["exits before readiness", "exit" as const, 4],
+    ["never becomes ready", "never" as const, 1],
+  ])("cleans up without stale state when the child %s", (_label, mode, timeoutSeconds) => {
+    const { root } = createFixture({ mode });
+
+    const result = runStart(root, { timeoutSeconds });
 
     expect(result.status).not.toBe(0);
     expect(existsSync(join(root, ".runtime", "server.json"))).toBe(false);
+    const childArgs = readFileSync(join(root, "child-arguments.json"), "utf8");
+    expect(childArgs).toContain("127.0.0.1");
   });
 
-  it("does not delete a runtime record it did not create", () => {
-    const root = createFixture({ nodeModules: true });
-    const serverFile = writeRuntime(root, 9911, "2026-08-13T04:05:06.123Z");
-    const before = readFileSync(serverFile, "utf8");
-
-    const result = runStart(root);
+  it("preserves a recoverable real identity when browser open and cleanup both fail", () => {
+    const { root } = createFixture();
+    const result = runDotSourcedDriver(
+      root,
+      [
+        "$script:fake = [pscustomobject]@{ Id = 8123; StartTime = [datetime]'2026-08-13T04:05:06Z'; HasExited = $false }",
+        "$script:fake | Add-Member ScriptMethod Refresh {}",
+        "function Get-Command { [pscustomobject]@{ Source = 'node.exe' } }",
+        "function Get-NetTCPConnection { $null }",
+        "function Invoke-WebRequest { [pscustomobject]@{ StatusCode = 200 } }",
+        "function Start-Process { param($FilePath) if ($FilePath -like 'http*') { throw 'browser failed' }; $script:fake }",
+        "function Stop-Process { throw 'stop failed' }",
+        `try { Invoke-HarnessStart -ProjectRoot '${escapePowerShell(root)}' -ReadinessTimeoutSeconds 1 } catch { Write-Error $_.Exception.Message; exit 1 }`,
+      ].join("\n"),
+    );
 
     expect(result.status).not.toBe(0);
-    expect(readFileSync(serverFile, "utf8")).toBe(before);
+    expect(runtimeRecord(root)).toEqual({ pid: 8123, startTime: "2026-08-13T04:05:06.0000000Z" });
+    expect(`${result.stdout}\n${result.stderr}`).toContain("Stop-Harness");
   });
 
-  it("contains no firewall mutation or wildcard bind as a supplementary static guard", () => {
+  it("contains no firewall mutation or wildcard bind", () => {
     const source = readFileSync(startSource, "utf8");
     expect(source).not.toMatch(/New-NetFirewallRule|0\.0\.0\.0/);
   });
 });
 
 describe("identity-safe local stopper", () => {
-  it("stops only a matching process within one second and then removes server.json", () => {
-    const root = createFixture();
+  it("stops only a matching process object and removes state after confirmed exit", () => {
+    const { root } = createFixture();
     const child = startOwnedSleeper();
-    const actualStart = processStartTime(child.pid!);
-    const withinOneSecond = new Date(Date.parse(actualStart) + 500).toISOString();
-    const serverFile = writeRuntime(root, child.pid!, withinOneSecond);
+    const serverFile = writeRuntime(root, child.pid!, new Date(Date.parse(processStartTime(child.pid!)) + 500).toISOString());
 
-    const result = runPowerShell(join(root, "scripts", "Stop-Harness.ps1"));
+    const result = runScript(join(root, "scripts", "Stop-Harness.ps1"));
 
     expect(result.status).toBe(0);
     expect(processExists(child.pid!)).toBe(false);
     expect(existsSync(serverFile)).toBe(false);
-  }, 15_000);
+  }, 20_000);
+
+  it("rechecks the same process object immediately before stop and refuses a replaced identity", () => {
+    const { root } = createFixture();
+    const serverFile = writeRuntime(root, 8123, "2026-08-13T04:05:06Z");
+    const stopMarker = join(root, "stop-called");
+    const result = runDotSourcedDriver(
+      root,
+      [
+        "$script:fake = [pscustomobject]@{ Id = 8123; StartTime = [datetime]'2026-08-13T04:05:06Z'; HasExited = $false }",
+        "$script:fake | Add-Member ScriptMethod Refresh { $this.StartTime = [datetime]'2026-08-13T04:05:20Z' }",
+        "function Get-Process { $script:fake }",
+        `function Stop-Process { Set-Content -LiteralPath '${escapePowerShell(stopMarker)}' -Value called }`,
+        `try { Invoke-HarnessStop -ProjectRoot '${escapePowerShell(root)}' } catch { Write-Error $_.Exception.Message; exit 1 }`,
+      ].join("\n"),
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(existsSync(stopMarker)).toBe(false);
+    expect(existsSync(serverFile)).toBe(true);
+  });
 
   it.each([
     ["mismatched identity", (root: string, pid: number, start: string) => writeRuntime(root, pid, new Date(Date.parse(start) + 10_000).toISOString())],
-    ["corrupt state", (root: string) => {
-      const runtime = join(root, ".runtime");
-      mkdirSync(runtime);
-      const path = join(runtime, "server.json");
-      writeFileSync(path, "not json", "utf8");
-      return path;
-    }],
-    ["unreadable state", (root: string) => {
-      const runtime = join(root, ".runtime");
-      mkdirSync(runtime);
-      const path = join(runtime, "server.json");
-      mkdirSync(path);
-      return path;
-    }],
-  ])("fails closed for %s without stopping the recorded process", (_label, prepare) => {
-    const root = createFixture();
+    ["corrupt state", (root: string) => { const path = writeRuntime(root, 1, new Date().toISOString()); writeFileSync(path, "not json"); return path; }],
+    ["unreadable state", (root: string) => { const runtime = join(root, ".runtime"); mkdirSync(runtime); const path = join(runtime, "server.json"); mkdirSync(path); return path; }],
+  ])("fails closed for %s", (_label, prepare) => {
+    const { root } = createFixture();
     const child = startOwnedSleeper();
-    const actualStart = processStartTime(child.pid!);
-    const serverFile = prepare(root, child.pid!, actualStart);
+    const serverFile = prepare(root, child.pid!, processStartTime(child.pid!));
 
-    const result = runPowerShell(join(root, "scripts", "Stop-Harness.ps1"));
+    const result = runScript(join(root, "scripts", "Stop-Harness.ps1"));
 
     expect(result.status).not.toBe(0);
     expect(processExists(child.pid!)).toBe(true);
     expect(existsSync(serverFile)).toBe(true);
-  }, 15_000);
+  }, 20_000);
 
-  it("fails closed when reading runtime state is denied", () => {
-    const root = createFixture();
+  it("fails closed on a denied state read without an environment-variable bypass", () => {
+    const { root } = createFixture();
     const child = startOwnedSleeper();
     const serverFile = writeRuntime(root, child.pid!, processStartTime(child.pid!));
-
-    const result = runPowerShell(join(root, "scripts", "Stop-Harness.ps1"), {
-      HARNESS_STOPPER_TEST: "1",
-      HARNESS_STOPPER_TEST_READ_DENIED: "1",
-    });
+    const result = runDotSourcedDriver(
+      root,
+      [
+        "function Get-Content { throw [UnauthorizedAccessException]::new('denied') }",
+        `try { Invoke-HarnessStop -ProjectRoot '${escapePowerShell(root)}' } catch { Write-Error $_.Exception.Message; exit 1 }`,
+      ].join("\n"),
+    );
 
     expect(result.status).not.toBe(0);
     expect(processExists(child.pid!)).toBe(true);
     expect(existsSync(serverFile)).toBe(true);
-  }, 15_000);
+  }, 20_000);
 
   it("keeps server.json when stopping the matching process fails", () => {
-    const root = createFixture();
+    const { root } = createFixture();
     const child = startOwnedSleeper();
     const serverFile = writeRuntime(root, child.pid!, processStartTime(child.pid!));
-
-    const result = runPowerShell(join(root, "scripts", "Stop-Harness.ps1"), {
-      HARNESS_STOPPER_TEST: "1",
-      HARNESS_STOPPER_TEST_FAIL_STOP: "1",
-    });
+    const result = runDotSourcedDriver(
+      root,
+      [
+        "function Stop-Process { throw 'stop failed' }",
+        `try { Invoke-HarnessStop -ProjectRoot '${escapePowerShell(root)}' } catch { Write-Error $_.Exception.Message; exit 1 }`,
+      ].join("\n"),
+    );
 
     expect(result.status).not.toBe(0);
     expect(processExists(child.pid!)).toBe(true);
     expect(existsSync(serverFile)).toBe(true);
-  }, 15_000);
+  }, 20_000);
 
-  it("refuses a runtime file whose real path escapes the project", () => {
-    const root = createFixture();
-    const outside = mkdtempSync(join(tmpdir(), "harness-runtime-outside-"));
+  it("refuses a runtime junction that resolves outside the project", () => {
+    const { root } = createFixture();
+    const outside = mkdtempSync(join(testTempRoot, "outside-"));
     temporaryRoots.push(outside);
     const child = startOwnedSleeper();
-    writeFileSync(
-      join(outside, "server.json"),
-      JSON.stringify({ pid: child.pid, startTime: processStartTime(child.pid!) }),
-      "utf8",
-    );
-    const junction = spawnSync(
-      "powershell.exe",
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        `New-Item -ItemType Junction -Path '${join(root, ".runtime").replaceAll("'", "''")}' -Target '${outside.replaceAll("'", "''")}' | Out-Null`,
-      ],
-      { encoding: "utf8" },
-    );
+    writeFileSync(join(outside, "server.json"), JSON.stringify({ pid: child.pid, startTime: processStartTime(child.pid!) }));
+    const junction = powerShellResult([
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `New-Item -ItemType Junction -Path '${escapePowerShell(join(root, ".runtime"))}' -Target '${escapePowerShell(outside)}' | Out-Null`,
+    ]);
     expect(junction.status).toBe(0);
 
-    const result = runPowerShell(join(root, "scripts", "Stop-Harness.ps1"));
+    const result = runScript(join(root, "scripts", "Stop-Harness.ps1"));
 
     expect(result.status).not.toBe(0);
     expect(processExists(child.pid!)).toBe(true);
     expect(existsSync(join(outside, "server.json"))).toBe(true);
-  }, 15_000);
+  }, 20_000);
 });

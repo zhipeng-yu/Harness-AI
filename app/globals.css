@@ -183,8 +183,9 @@ main {
 .next-action a {
   justify-self: start;
   padding: 0.65rem 1rem;
-  color: #fff;
-  background: var(--action);
+  color: var(--ink);
+  background: var(--paper);
+  border: 3px solid var(--action);
   font-weight: 700;
   text-decoration: none;
 }
@@ -418,8 +419,9 @@ button:disabled {
 
 [role="alert"] {
   padding: 0.75rem 0.9rem;
-  color: #fff;
-  background: var(--action);
+  color: var(--ink);
+  background: var(--paper);
+  border-left: 5px solid var(--action);
   font-weight: 700;
 }
 

@@ -5,8 +5,10 @@ function Get-Utf8Text {
   return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Base64))
 }
 
-try {
-  $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+function Invoke-HarnessStop {
+  param([Parameter(Mandatory = $true)][string]$ProjectRoot)
+
+  $projectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
   $runtimeDir = Join-Path $projectRoot '.runtime'
   $serverFile = Join-Path $runtimeDir 'server.json'
 
@@ -29,9 +31,6 @@ try {
   }
 
   try {
-    if ($env:HARNESS_STOPPER_TEST -eq '1' -and $env:HARNESS_STOPPER_TEST_READ_DENIED -eq '1') {
-      throw [UnauthorizedAccessException]::new('Test-only denied read')
-    }
     $record = Get-Content -Raw -LiteralPath $resolvedServerFile -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
   } catch {
     throw (Get-Utf8Text '6L+Q6KGM6K6w5b2V5peg5rOV5a6J5YWo6K+75Y+W77yM5ouS57ud5YGc5q2i5Lu75L2V6L+b56iL44CC')
@@ -45,30 +44,38 @@ try {
   if (-not [DateTimeOffset]::TryParse([string]$record.startTime, [ref]$recordedStart)) {
     throw (Get-Utf8Text '6L+Q6KGM6K6w5b2V5Lit55qE5ZCv5Yqo5pe26Ze05peg5pWI77yM5ouS57ud5YGc5q2i5Lu75L2V6L+b56iL44CC')
   }
+  $expectedStart = $recordedStart.ToUniversalTime().UtcDateTime
 
   $process = Get-Process -Id $recordedPid -ErrorAction Stop
   $actualStart = $process.StartTime.ToUniversalTime()
-  $expectedStart = $recordedStart.ToUniversalTime().UtcDateTime
   if ([Math]::Abs(($actualStart - $expectedStart).TotalSeconds) -gt 1) {
     throw (Get-Utf8Text 'UElEIOS4juWQr+WKqOaXtumXtOS4jeWMuemFje+8jOaLkue7neWBnOatouS7u+S9lei/m+eoi+OAgg==')
   }
 
-  if ($env:HARNESS_STOPPER_TEST -eq '1' -and $env:HARNESS_STOPPER_TEST_FAIL_STOP -eq '1') {
-    throw [InvalidOperationException]::new('Test-only stop failure')
+  $process.Refresh()
+  if ($process.HasExited) {
+    throw (Get-Utf8Text '572R56uZ6L+b56iL5bey6YCA5Ye677yM5L+d55WZ6L+Q6KGM6K6w5b2V44CC')
   }
-  Stop-Process -Id $recordedPid -ErrorAction Stop
-  $deadline = [DateTime]::UtcNow.AddSeconds(10)
-  while ([DateTime]::UtcNow -lt $deadline) {
-    if ($null -eq (Get-Process -Id $recordedPid -ErrorAction SilentlyContinue)) { break }
-    Start-Sleep -Milliseconds 100
+  $actualStart = $process.StartTime.ToUniversalTime()
+  if ([Math]::Abs(($actualStart - $expectedStart).TotalSeconds) -gt 1) {
+    throw (Get-Utf8Text 'UElEIOS4juWQr+WKqOaXtumXtOS4jeWMuemFje+8jOaLkue7neWBnOatouS7u+S9lei/m+eoi+OAgg==')
   }
-  if ($null -ne (Get-Process -Id $recordedPid -ErrorAction SilentlyContinue)) {
+
+  Stop-Process -InputObject $process -ErrorAction Stop
+  if (-not $process.WaitForExit(10000)) {
     throw (Get-Utf8Text '572R56uZ6L+b56iL5pyq6IO956Gu6K6k5YGc5q2i77yM5L+d55WZ6L+Q6KGM6K6w5b2V44CC')
   }
 
   Remove-Item -LiteralPath $resolvedServerFile -Force
   Write-Host (Get-Utf8Text '5pys5Zyw572R56uZ5bey5YGc5q2i44CC')
-} catch {
-  Write-Error $_.Exception.Message
-  exit 1
+}
+
+if ($MyInvocation.InvocationName -ne '.') {
+  try {
+    $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+    Invoke-HarnessStop -ProjectRoot $projectRoot
+  } catch {
+    Write-Error $_.Exception.Message
+    exit 1
+  }
 }

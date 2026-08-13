@@ -38,3 +38,16 @@
 
 - `tsconfig.tsbuildinfo` was left untouched and untracked.
 - No dependencies were installed and no firewall, global PowerShell policy, or user configuration was changed.
+
+## Review fix round 1
+
+- Removed every production `HARNESS_LAUNCHER_TEST` / `HARNESS_STOPPER_TEST` branch. Inherited test-looking environment variables cannot bypass Node, dependency, port, build, readiness, or identity gates.
+- Refactored the scripts into dot-sourceable `Invoke-HarnessStart` and `Invoke-HarnessStop` functions while keeping normal `.ps1` execution unchanged. Tests replace commands only in their own PowerShell process; the double-click wrappers cannot activate those replacements.
+- Replaced the address-filtered port query with `.NET` active TCP listener inspection across IPv4, IPv6, wildcard, and loopback addresses. A real test-owned Node listener on `0.0.0.0:3000` verifies that no backup or other project command runs.
+- Added a bounded HTTP readiness loop for `http://127.0.0.1:3000`. Runtime state and browser opening now happen only after readiness. Real Node fixtures cover immediate readiness, delayed readiness, early exit, and timeout.
+- Failed startup stops and confirms the exact child process. If cleanup cannot stop it, the script writes its real PID/start time and instructs the user to run `Stop-Harness.cmd` instead of deleting recoverable state.
+- The stopper now refreshes and rechecks the same captured `Process` object immediately before `Stop-Process -InputObject`, waits on that object, and removes state only after confirmed exit. A simulated replaced identity proves no replacement process is stopped.
+- Kept `--action: #c86b35` unchanged while moving orange to borders on paper; action and alert text now uses `--ink` on `--paper`. The deterministic contrast test verifies a ratio of at least 4.5:1.
+- The production server launches the Next CLI directly through the Node executable, so no extra shell process is introduced. The review found no evidence of launcher-created descendants requiring tree termination.
+- Review focused verification: 2 files, 19 tests passed.
+- Review final verification: 17 files and 170 tests passed; lint passed with no errors or warnings; production build passed TypeScript and route generation; both PowerShell scripts parsed; CMD wrappers remained exact; production test seams were absent; diff check passed; port 3000 had no listener after tests.
