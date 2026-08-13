@@ -1,12 +1,12 @@
-# Content workflow
+# 内容制作工作流
 
-1. Inspect the source audio without modifying it.
-2. Create an internal workspace transcript.
-3. Clean the speech in that transcript.
-4. Flag missing visuals.
-5. Extract the chapter structure.
-6. Fill the fixed chapter content contract.
-7. Check the chapter against the source for fidelity.
-8. Request owner approval.
-9. Publish the approved chapter and run content validation.
-10. After approval, delete the workspace transcript without touching the user's source audio.
+1. 检查源音频，但不得修改用户的源音频。
+2. 在工作区创建内部转录稿。
+3. 整理转录稿中的口语与识别错误。
+4. 标记缺失的视觉素材或无法确认的画面信息。
+5. 提取章节结构。
+6. 按固定章节内容契约填写内容。
+7. 对照源材料检查内容保真度。
+8. 请求内容所有者审批。
+9. 发布获批章节并运行内容校验。
+10. 审批后删除工作区转录稿，且不得触碰用户的源音频。

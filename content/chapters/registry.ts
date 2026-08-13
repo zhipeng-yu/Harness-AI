@@ -26,12 +26,12 @@ const awaitingChapters: readonly ChapterDefinition[] = [
 const productionChapters = awaitingChapters.map((chapter) => chapterSchema.parse(chapter));
 const e2ePublishedChapter = chapterSchema.parse(publishedChapterFixture);
 
-function assertRegistry(chapters: readonly ChapterDefinition[]): void {
+export function assertChapterRegistry(chapters: readonly ChapterDefinition[]): void {
   const ids = new Set(chapters.map((chapter) => chapter.id));
   const slugs = new Set(chapters.map((chapter) => chapter.slug));
   const orders = new Set(chapters.map((chapter) => chapter.order));
 
-  if (ids.size !== 18 || slugs.size !== 18 || orders.size !== 18) {
+  if (chapters.length !== 18 || ids.size !== 18 || slugs.size !== 18 || orders.size !== 18) {
     throw new Error("Chapter registry IDs, slugs, and orders must be unique.");
   }
 
@@ -42,7 +42,7 @@ function assertRegistry(chapters: readonly ChapterDefinition[]): void {
   }
 }
 
-assertRegistry(productionChapters);
+assertChapterRegistry(productionChapters);
 
 export function getChapters(): readonly ChapterDefinition[] {
   if (

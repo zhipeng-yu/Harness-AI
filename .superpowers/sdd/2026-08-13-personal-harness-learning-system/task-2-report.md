@@ -81,3 +81,53 @@ Results: 2 test files / 4 tests passed; ESLint exited 0; focused schema suite pa
 ## Concerns
 
 - None.
+
+## Fix round 1 — Review findings
+
+### Changes
+
+- Made the `awaiting_audio` schema branch strict, so processed content such as `problem` is rejected instead of stripped.
+- Exported the registry invariant for direct verification and made it reject every registry whose length is not exactly 18, including a 19th duplicate record.
+- Added registry tests for the default 18 awaiting-audio chapters, IDs, slugs, exact order coverage, the duplicate-record invariant, and the two-variable E2E fixture gate that replaces only chapter 1.
+- Rewrote the author workflow in Chinese.
+
+### Coverage
+
+Updated `tests/unit/content-schema.test.ts` with four new behavior tests. The E2E-gate test resets the module cache and restores environment stubs after each test.
+
+### RED
+
+Command:
+
+```powershell
+npm.cmd test -- tests/unit/content-schema.test.ts
+```
+
+Key output before the implementation change:
+
+```text
+× rejects processed sections on an awaiting-audio chapter
+AssertionError: expected [Function] to throw an error
+```
+
+This confirmed that Zod was stripping processed fields from an awaiting-audio record.
+
+### GREEN and final verification
+
+Commands:
+
+```powershell
+npm.cmd test -- tests/unit/content-schema.test.ts
+npm.cmd run content:validate
+npm.cmd run lint
+git -c safe.directory='E:/Project/ledu_project/Harness AI' diff --check
+```
+
+Key output:
+
+```text
+Tests  7 passed (7)
+Validated 18 chapters (0 published).
+```
+
+Lint and `diff --check` both exited 0.

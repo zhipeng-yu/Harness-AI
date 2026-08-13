@@ -11,7 +11,7 @@ const baseChapter = z.object({
   title: z.string().min(2),
 });
 
-const awaitingChapter = baseChapter.extend({ status: z.literal("awaiting_audio") });
+const awaitingChapter = baseChapter.extend({ status: z.literal("awaiting_audio") }).strict();
 const publishedChapter = baseChapter.extend({
   status: z.literal("published"),
   problem: z.string().min(20),
