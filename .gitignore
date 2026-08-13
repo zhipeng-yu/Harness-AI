@@ -1,0 +1,8 @@
+.superpowers/
+.tools/
+node_modules/
+.next/
+dist/
+.env*
+data/*.sqlite*
+backups/
