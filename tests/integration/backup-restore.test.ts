@@ -4,13 +4,17 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
   rmSync,
   writeFileSync,
+  symlinkSync,
+  linkSync,
 } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { artifactRepository } from "@/src/features/artifacts/repository";
 import { responseRepository } from "@/src/features/responses/repository";
@@ -20,6 +24,7 @@ import {
   verifyBackup,
 } from "@/src/lib/db/backup";
 import { backupFileOps } from "@/src/lib/db/backup-file-ops";
+import { backupRuntimeOps } from "@/src/lib/db/backup-runtime-ops";
 import { openDatabase } from "@/src/lib/db/connection";
 import { migrate } from "@/src/lib/db/migrate";
 
@@ -27,12 +32,19 @@ const projectRoot = resolve(process.cwd());
 const dataRoot = join(projectRoot, "data");
 const backupRoot = join(projectRoot, "backups");
 const cleanupPaths: string[] = [];
+const externalCleanupPaths: string[] = [];
 const databases: DatabaseSync[] = [];
 
 function makeProjectTemp(root: string, prefix: string) {
   mkdirSync(root, { recursive: true });
   const path = mkdtempSync(join(root, prefix));
   cleanupPaths.push(path);
+  return path;
+}
+
+function makeExternalTemp(prefix: string) {
+  const path = mkdtempSync(join(tmpdir(), prefix));
+  externalCleanupPaths.push(path);
   return path;
 }
 
@@ -87,9 +99,39 @@ afterEach(() => {
     assertCleanupBoundary(path);
     rmSync(path, { recursive: true, force: true });
   }
+  while (externalCleanupPaths.length > 0) {
+    const path = externalCleanupPaths.pop()!;
+    const absolute = realpathSync(path);
+    const relativeToTmp = relative(realpathSync(tmpdir()), absolute);
+    if (
+      relativeToTmp === "" ||
+      relativeToTmp === ".." ||
+      relativeToTmp.startsWith(`..${sep}`)
+    ) {
+      throw new Error(`Refusing external test cleanup outside temp: ${absolute}`);
+    }
+    rmSync(absolute, { recursive: true, force: true });
+  }
 });
 
 describe("verified SQLite backups", () => {
+  it("refuses a backup directory junction that resolves outside project backups", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const linkParent = makeProjectTemp(backupRoot, "task9-backups-");
+    const external = makeExternalTemp("task9-external-");
+    const linkedBackupDir = join(linkParent, "escape");
+    symlinkSync(external, linkedBackupDir, "junction");
+    const sourcePath = join(dataDir, "harness.sqlite");
+    const { db } = seedDatabase(sourcePath);
+
+    await expect(createVerifiedBackup(sourcePath, linkedBackupDir)).rejects.toThrow(
+      /real|junction|boundary|outside/i,
+    );
+
+    expect(readdirSync(external)).toEqual([]);
+    closeDatabase(db);
+  });
+
   it("backs up online data and restores the exact response and Artifact version", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
@@ -205,6 +247,31 @@ describe("verified SQLite backups", () => {
     closeDatabase(db);
   });
 
+  it("creates distinct verified backups and records from concurrent processes", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const sourcePath = join(dataDir, "harness.sqlite");
+    const { db } = seedDatabase(sourcePath);
+    closeDatabase(db);
+    const startAt = Date.now() + 1_000;
+
+    const [first, second] = await Promise.all([
+      runBackupWorker(sourcePath, backupDir, startAt),
+      runBackupWorker(sourcePath, backupDir, startAt),
+    ]);
+
+    expect(first, first.stderr).toMatchObject({ code: 0 });
+    expect(second, second.stderr).toMatchObject({ code: 0 });
+    const files = dbBackupFiles(backupDir);
+    expect(files).toHaveLength(2);
+    expect(new Set(files.map((path) => basename(path))).size).toBe(2);
+    for (const path of files) expect(verifyBackup(path).integrity).toBe("ok");
+    const source = trackDatabase(sourcePath);
+    expect(
+      source.prepare("SELECT COUNT(*) AS count FROM backup_records").get(),
+    ).toEqual({ count: 2 });
+  });
+
   it("keeps manual and pre_restore backups while pruning only verified automatic backups beyond ten", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
@@ -272,6 +339,59 @@ describe("verified SQLite backups", () => {
 });
 
 describe("guarded restore", () => {
+  it("refuses a backup source junction that resolves outside project backups", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const external = makeExternalTemp("task9-external-");
+    const externalSource = join(external, "source.sqlite");
+    const seeded = seedDatabase(externalSource, "external source");
+    closeDatabase(seeded.db);
+    const linked = join(backupDir, "escape");
+    symlinkSync(external, linked, "junction");
+    const target = join(dataDir, "harness.sqlite");
+
+    await expect(
+      restoreBackup({ source: join(linked, "source.sqlite"), target, confirm: true }),
+    ).rejects.toThrow(/real|junction|boundary|outside/i);
+
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it("refuses a restore target junction that resolves outside project data", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const external = makeExternalTemp("task9-external-");
+    const sourceDbPath = join(dataDir, "source.sqlite");
+    const seeded = seedDatabase(sourceDbPath);
+    const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+    closeDatabase(seeded.db);
+    const linked = join(dataDir, "escape");
+    symlinkSync(external, linked, "junction");
+    const target = join(linked, "harness.sqlite");
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow(
+      /real|junction|boundary|outside/i,
+    );
+
+    expect(readdirSync(external)).toEqual([]);
+  });
+
+  it("rejects source and target hardlinks to the same database file", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const target = join(dataDir, "harness.sqlite");
+    const seeded = seedDatabase(target);
+    closeDatabase(seeded.db);
+    const source = join(backupDir, "hardlink.sqlite");
+    linkSync(target, source);
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow(
+      /same|identity|hardlink/i,
+    );
+
+    expect(readResponse(target)).toBe("必须精确保留的回答");
+  });
+
   it("makes a verified pre_restore backup before replacing an existing target", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
@@ -293,15 +413,24 @@ describe("guarded restore", () => {
         "chapter-01-reflection-01",
       )?.value,
     ).toBe("new source answer");
-    const preRestoreRecord = restored
-      .prepare("SELECT path FROM backup_records WHERE kind = 'pre_restore'")
-      .get() as { path: string } | undefined;
-    expect(preRestoreRecord).toBeUndefined();
     const backupNames = new Set([source]);
     const preRestorePaths = dbBackupFiles(backupDir).filter(
       (path) => !backupNames.has(path),
     );
     expect(preRestorePaths).toHaveLength(1);
+    const preRestoreRecord = restored
+      .prepare(
+        "SELECT path, kind, verified_at FROM backup_records WHERE kind = 'pre_restore'",
+      )
+      .get() as
+      | { path: string; kind: string; verified_at: string }
+      | undefined;
+    expect(preRestoreRecord).toMatchObject({
+      path: preRestorePaths[0],
+      kind: "pre_restore",
+    });
+    expect(Number.isNaN(Date.parse(preRestoreRecord!.verified_at))).toBe(false);
+    expect(verifyBackup(preRestoreRecord!.path).integrity).toBe("ok");
     const preRestore = trackDatabase(preRestorePaths[0]!);
     expect(
       responseRepository(preRestore).get(
@@ -332,7 +461,10 @@ describe("guarded restore", () => {
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
     const target = join(dataDir, "harness.sqlite");
     const outside = join(projectRoot, "outside.sqlite");
-    const source = join(backupDir, "source.sqlite");
+    const sourceDbPath = join(dataDir, "source.sqlite");
+    const seeded = seedDatabase(sourceDbPath);
+    const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+    closeDatabase(seeded.db);
 
     await expect(restoreBackup({ source: outside, target, confirm: true })).rejects.toThrow(/backups/i);
     await expect(restoreBackup({ source, target: outside, confirm: true })).rejects.toThrow(/data/i);
@@ -409,6 +541,54 @@ describe("guarded restore", () => {
     expect(existsSync(join(dataDir, "harness.pre-restore.sqlite"))).toBe(false);
   });
 
+  it("preserves the rollback sibling with explicit paths when bad-target removal fails", async () => {
+    const setup = await setupRestoreFailureFiles();
+    vi.spyOn(backupFileOps, "rename").mockImplementation((from, to) => {
+      renameSync(from, to);
+      if (basename(from).startsWith(`.${basename(setup.target)}.restore-`)) {
+        writeFileSync(to, "corrupted after install");
+      }
+    });
+    vi.spyOn(backupFileOps, "remove").mockImplementation((path) => {
+      if (path === setup.target) throw new Error("injected rollback remove failure");
+      rmSync(path);
+    });
+
+    await expect(
+      restoreBackup({ source: setup.source, target: setup.target, confirm: true }),
+    ).rejects.toThrow(
+      new RegExp(
+        `${escapeRegex(setup.target)}.*${escapeRegex(setup.rollback)}|${escapeRegex(setup.rollback)}.*${escapeRegex(setup.target)}`,
+        "i",
+      ),
+    );
+
+    expect(readResponse(setup.rollback)).toBe("old target answer");
+  });
+
+  it("preserves the rollback sibling with explicit paths when rollback rename fails", async () => {
+    const setup = await setupRestoreFailureFiles();
+    let renameNumber = 0;
+    vi.spyOn(backupFileOps, "rename").mockImplementation((from, to) => {
+      renameNumber += 1;
+      if (renameNumber === 3) throw new Error("injected rollback rename failure");
+      renameSync(from, to);
+      if (renameNumber === 2) writeFileSync(to, "corrupted after install");
+    });
+
+    await expect(
+      restoreBackup({ source: setup.source, target: setup.target, confirm: true }),
+    ).rejects.toThrow(
+      new RegExp(
+        `${escapeRegex(setup.target)}.*${escapeRegex(setup.rollback)}|${escapeRegex(setup.rollback)}.*${escapeRegex(setup.target)}`,
+        "i",
+      ),
+    );
+
+    expect(existsSync(setup.target)).toBe(false);
+    expect(readResponse(setup.rollback)).toBe("old target answer");
+  });
+
   it("CLI without --confirm exits nonzero without changing files", () => {
     const isolatedRoot = makeProjectTemp(dataRoot, "task9-cli-");
     const isolatedData = join(isolatedRoot, "data");
@@ -444,7 +624,10 @@ describe("guarded restore", () => {
     closeDatabase(targetDb.db);
     const sourceDb = seedDatabase(source, "unused source");
     closeDatabase(sourceDb.db);
-    writeFileSync(join(runtime, "server.json"), JSON.stringify({ pid: process.pid }));
+    writeFileSync(
+      join(runtime, "server.json"),
+      JSON.stringify({ pid: process.pid, startTime: currentProcessStartTime() }),
+    );
     const before = readFileSync(target);
 
     const result = runRestoreCli(isolatedRoot, [source, "--confirm"]);
@@ -453,6 +636,69 @@ describe("guarded restore", () => {
     expect(result.stderr).toMatch(/website process is running/i);
     expect(readFileSync(target)).toEqual(before);
     expect(dbBackupFiles(isolatedBackups)).toEqual([source]);
+  }, 15_000);
+
+  it("does not treat a reused PID with a mismatched startTime as the website", () => {
+    const setup = setupCliRestore("task9-cli-");
+    writeFileSync(
+      join(setup.runtime, "server.json"),
+      JSON.stringify({ pid: process.pid, startTime: "2000-01-01T00:00:00.000Z" }),
+    );
+
+    const result = runRestoreCli(setup.root, [setup.source, "--confirm"]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(readResponse(setup.target)).toBe("unused source");
+  }, 15_000);
+
+  it("allows restore when server.json identifies a dead PID", () => {
+    const setup = setupCliRestore("task9-cli-");
+    writeFileSync(
+      join(setup.runtime, "server.json"),
+      JSON.stringify({ pid: 2_147_483_647, startTime: "2026-01-01T00:00:00.000Z" }),
+    );
+
+    const result = runRestoreCli(setup.root, [setup.source, "--confirm"]);
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(readResponse(setup.target)).toBe("unused source");
+  }, 15_000);
+
+  it("fails closed when server.json is malformed", () => {
+    const setup = setupCliRestore("task9-cli-");
+    writeFileSync(join(setup.runtime, "server.json"), "not json");
+    const before = readFileSync(setup.target);
+
+    const result = runRestoreCli(setup.root, [setup.source, "--confirm"]);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/server\.json|runtime state|malformed/i);
+    expect(readFileSync(setup.target)).toEqual(before);
+  });
+
+  it("fails closed when server.json cannot be read", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const target = join(dataDir, "harness.sqlite");
+    const sourceDb = join(dataDir, "source.sqlite");
+    const seededTarget = seedDatabase(target, "unchanged target");
+    closeDatabase(seededTarget.db);
+    const seededSource = seedDatabase(sourceDb, "unused source");
+    const source = (await createVerifiedBackup(sourceDb, backupDir)).path;
+    closeDatabase(seededSource.db);
+    const before = readFileSync(target);
+    vi.spyOn(backupRuntimeOps, "stateExists").mockReturnValue(true);
+    vi.spyOn(backupRuntimeOps, "readState").mockImplementation(() => {
+      const error = new Error("access denied") as NodeJS.ErrnoException;
+      error.code = "EACCES";
+      throw error;
+    });
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow(
+      /runtime state|server\.json|read/i,
+    );
+
+    expect(readFileSync(target)).toEqual(before);
   });
 });
 
@@ -487,4 +733,86 @@ function runRestoreCli(cwd: string, args: string[]) {
     cwd,
     encoding: "utf8",
   });
+}
+
+function runBackupWorker(source: string, backupDir: string, startAt: number) {
+  const cli = join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
+  const worker = join(
+    projectRoot,
+    "tests",
+    "integration",
+    "fixtures",
+    "backup-worker.ts",
+  );
+  return new Promise<{ code: number | null; stdout: string; stderr: string }>(
+    (resolveResult) => {
+      const child = spawn(
+        process.execPath,
+        [cli, worker, source, backupDir, String(startAt)],
+        { cwd: projectRoot, stdio: ["ignore", "pipe", "pipe"] },
+      );
+      let stdout = "";
+      let stderr = "";
+      child.stdout.setEncoding("utf8").on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.setEncoding("utf8").on("data", (chunk) => {
+        stderr += chunk;
+      });
+      child.on("close", (code) => resolveResult({ code, stdout, stderr }));
+    },
+  );
+}
+
+function currentProcessStartTime() {
+  const result = spawnSync(
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `(Get-Process -Id ${process.pid} -ErrorAction Stop).StartTime.ToUniversalTime().ToString('O')`,
+    ],
+    { encoding: "utf8" },
+  );
+  if (result.status !== 0) throw new Error(result.stderr);
+  return result.stdout.trim();
+}
+
+function setupCliRestore(prefix: string) {
+  const root = makeProjectTemp(dataRoot, prefix);
+  const data = join(root, "data");
+  const backups = join(root, "backups");
+  const runtime = join(root, ".runtime");
+  mkdirSync(data);
+  mkdirSync(backups);
+  mkdirSync(runtime);
+  const target = join(data, "harness.sqlite");
+  const source = join(backups, "source.sqlite");
+  const targetDb = seedDatabase(target, "unchanged target");
+  closeDatabase(targetDb.db);
+  const sourceDb = seedDatabase(source, "unused source");
+  closeDatabase(sourceDb.db);
+  return { root, data, backups, runtime, target, source };
+}
+
+async function setupRestoreFailureFiles() {
+  const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+  const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+  const target = join(dataDir, "harness.sqlite");
+  const sourceDbPath = join(dataDir, "replacement.sqlite");
+  const oldTarget = seedDatabase(target, "old target answer");
+  closeDatabase(oldTarget.db);
+  const replacement = seedDatabase(sourceDbPath, "new source answer");
+  const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+  closeDatabase(replacement.db);
+  return {
+    target,
+    source,
+    rollback: join(dataDir, "harness.pre-restore.sqlite"),
+  };
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
