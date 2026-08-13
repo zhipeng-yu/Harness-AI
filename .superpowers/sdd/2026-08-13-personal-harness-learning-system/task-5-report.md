@@ -53,3 +53,34 @@ Result: 2 files passed, 9 tests passed.
 - `git diff --check`: exit 0.
 
 `tsconfig.tsbuildinfo` remained untracked and is intentionally excluded from the commit.
+
+## Fix round 1: malformed JSON validation
+
+Review identified that `request.json()` could reject before the Zod validation boundary, causing an empty body or malformed JSON to escape as a 500 instead of the required `400 { error: "invalid_progress" }`.
+
+### RED
+
+Command:
+
+```powershell
+npm.cmd test -- tests/unit/progress-route.test.tsx
+```
+
+Result: 2 failed, 6 passed. The empty-body case threw `Unexpected end of JSON input`; the truncated-JSON case threw a JSON `SyntaxError`. Both failures occurred before an HTTP response was returned.
+
+### GREEN
+
+After adding a narrow `try/catch` around `request.json()`:
+
+```powershell
+npm.cmd test -- tests/unit/progress-route.test.tsx
+```
+
+Result: 1 file passed, 8 tests passed.
+
+### Fix verification
+
+- `npm.cmd test`: 6 files passed, 33 tests passed.
+- `npm.cmd run lint`: exit 0, no warnings or errors.
+- `npm.cmd run build`: exit 0; `/api/progress` and `/chapters/[slug]` remain dynamic routes.
+- `git diff --check`: exit 0.

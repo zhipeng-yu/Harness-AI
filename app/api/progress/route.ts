@@ -11,7 +11,14 @@ const progressInput = z.object({
 });
 
 export async function PUT(request: Request) {
-  const parsed = progressInput.safeParse(await request.json());
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid_progress" }, { status: 400 });
+  }
+
+  const parsed = progressInput.safeParse(body);
   if (!parsed.success) {
     return Response.json({ error: "invalid_progress" }, { status: 400 });
   }

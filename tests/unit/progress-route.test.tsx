@@ -23,6 +23,22 @@ afterEach(() => {
 
 describe("PUT /api/progress", () => {
   it.each([
+    ["an empty body", ""],
+    ["truncated JSON", '{"chapterId":"chapter-01"'],
+  ])("rejects %s as invalid progress", async (_case, body) => {
+    const response = await PUT(
+      new Request("http://localhost/api/progress", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "invalid_progress" });
+  });
+
+  it.each([
     { chapterId: "chapter-19", learningStage: "understanding" },
     { chapterId: "chapter-01", learningStage: "not_started" },
   ])("rejects an invalid progress body", async (body) => {
