@@ -47,9 +47,6 @@ describe("ChapterWorkspace", () => {
       />,
     );
 
-    expect(screen.getAllByRole("textbox")).toHaveLength(
-      publishedChapterFixture.reflectionPrompts.length,
-    );
     expect(screen.getByRole("textbox", { name: prompt.question })).toHaveValue(
       "已经保存的回答",
     );

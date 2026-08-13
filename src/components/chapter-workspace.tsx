@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChapterDefinition } from "@/content/schema";
 import type { ActionPlan } from "@/src/features/actions/repository";
 import type { ArtifactStatus, LearningStage } from "@/src/types/learning";
+import { ActionPlanForm } from "./action-plan-form";
+import { ArtifactEditor } from "./artifact-editor";
+import { ArtifactReviewForm, isArtifactState } from "./artifact-review-form";
 import { AutosaveField } from "./autosave-field";
 import { ProgressStepper } from "./progress-stepper";
 
@@ -34,6 +37,10 @@ export function ChapterWorkspace({
   const [learningStage, setLearningStage] = useState(initialLearningStage);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [savedActionPlan, setSavedActionPlan] = useState(actionPlan);
+  const [currentArtifact, setCurrentArtifact] = useState(artifact);
+  const [artifactSaving, setArtifactSaving] = useState(false);
+  const [artifactError, setArtifactError] = useState(false);
   const opened = useRef(false);
 
   const saveProgress = useCallback(async (nextStage: "understanding" | "learned") => {
@@ -61,6 +68,47 @@ export function ChapterWorkspace({
     opened.current = true;
     void saveProgress("understanding");
   }, [initialLearningStage, saveProgress]);
+
+  const updateArtifactState = useCallback(
+    async (
+      event: "start_practice" | "mark_review_ready" | "create_next_version" | "archive",
+    ) => {
+      if (!currentArtifact) return;
+      setArtifactSaving(true);
+      setArtifactError(false);
+      try {
+        const response = await fetch(`/api/artifacts/${currentArtifact.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event }),
+        });
+        if (!response.ok) throw new Error("artifact_transition_failed");
+        const payload: unknown = await response.json();
+        if (!isArtifactState(payload)) throw new Error("invalid_artifact_state");
+        setCurrentArtifact((previous) =>
+          previous
+            ? { ...previous, status: payload.status, currentVersion: payload.version }
+            : previous,
+        );
+      } catch {
+        setArtifactError(true);
+      } finally {
+        setArtifactSaving(false);
+      }
+    },
+    [currentArtifact],
+  );
+
+  const acceptArtifactState = useCallback(
+    (state: { status: ArtifactStatus; version: number }) => {
+      setCurrentArtifact((previous) =>
+        previous
+          ? { ...previous, status: state.status, currentVersion: state.version }
+          : previous,
+      );
+    },
+    [],
+  );
 
   return (
     <main className="chapter-workspace">
@@ -106,6 +154,77 @@ export function ChapterWorkspace({
           ))}
         </section>
 
+        <section>
+          <h2>行动设计</h2>
+          <ActionPlanForm
+            chapterId={chapter.id}
+            initialValue={savedActionPlan}
+            onSaved={setSavedActionPlan}
+          />
+        </section>
+
+        <section>
+          <h2>创建 Artifact</h2>
+          {!currentArtifact ? (
+            <ArtifactEditor
+              chapterId={chapter.id}
+              title={chapter.artifactTemplate.title}
+              onCreated={setCurrentArtifact}
+            />
+          ) : (
+            <div>
+              <p>{currentArtifact.title}</p>
+              <p>版本 {currentArtifact.currentVersion}</p>
+              <p>{currentArtifact.status}</p>
+              {currentArtifact.status === "draft" ? (
+                <button
+                  type="button"
+                  disabled={artifactSaving}
+                  onClick={() => void updateArtifactState("start_practice")}
+                >
+                  开始实践
+                </button>
+              ) : null}
+              {currentArtifact.status === "in_practice" ? (
+                <button
+                  type="button"
+                  disabled={artifactSaving}
+                  onClick={() => void updateArtifactState("mark_review_ready")}
+                >
+                  标记为可以复盘
+                </button>
+              ) : null}
+              {currentArtifact.status === "review_ready" ? (
+                <ArtifactReviewForm
+                  artifactId={currentArtifact.id}
+                  onSaved={acceptArtifactState}
+                />
+              ) : null}
+              {currentArtifact.status === "reviewed" ? (
+                <button
+                  type="button"
+                  disabled={artifactSaving}
+                  onClick={() => void updateArtifactState("create_next_version")}
+                >
+                  创建下一版本
+                </button>
+              ) : null}
+              {currentArtifact.status !== "archived" ? (
+                <button
+                  type="button"
+                  disabled={artifactSaving}
+                  onClick={() => void updateArtifactState("archive")}
+                >
+                  归档 Artifact
+                </button>
+              ) : null}
+              {artifactError ? (
+                <p role="alert">Artifact 状态更新失败，请重试。</p>
+              ) : null}
+            </div>
+          )}
+        </section>
+
         <button
           type="button"
           disabled={saving || learningStage === "learned"}
@@ -118,20 +237,20 @@ export function ChapterWorkspace({
 
       <aside className="chapter-workspace__summary" aria-label="行动与产物摘要">
         <h2>行动摘要</h2>
-        {actionPlan ? (
+        {savedActionPlan ? (
           <div>
-            <p>{actionPlan.action}</p>
-            <p>成功标准：{actionPlan.successCriteria}</p>
+            <p>{savedActionPlan.action}</p>
+            <p>成功标准：{savedActionPlan.successCriteria}</p>
           </div>
         ) : (
           <p>尚未制定行动</p>
         )}
         <h2>Artifact 摘要</h2>
-        {artifact ? (
+        {currentArtifact ? (
           <div>
-            <p>{artifact.title}</p>
-            <p>版本 {artifact.currentVersion}</p>
-            <p>{artifact.status}</p>
+            <p>{currentArtifact.title}</p>
+            <p>版本 {currentArtifact.currentVersion}</p>
+            <p>{currentArtifact.status}</p>
           </div>
         ) : (
           <p>尚未创建 Artifact</p>
