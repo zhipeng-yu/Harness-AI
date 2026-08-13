@@ -3,6 +3,14 @@
 import { useCallback, useState } from "react";
 import { useAutosave } from "./use-autosave";
 
+function hasValidUpdatedAt(value: unknown): value is { updatedAt: string } {
+  if (typeof value !== "object" || value === null || !("updatedAt" in value)) return false;
+  const updatedAt = value.updatedAt;
+  if (typeof updatedAt !== "string") return false;
+  const timestamp = Date.parse(updatedAt);
+  return !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === updatedAt;
+}
+
 export type AutosaveFieldProps = Readonly<{
   chapterId: string;
   promptId: string;
@@ -26,6 +34,8 @@ export function AutosaveField({
         signal,
       });
       if (!response.ok) throw new Error("response_not_saved");
+      const payload: unknown = await response.json();
+      if (!hasValidUpdatedAt(payload)) throw new Error("invalid_response_payload");
     },
     [chapterId, promptId],
   );

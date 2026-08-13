@@ -48,3 +48,34 @@ Final command results after the last implementation change:
 - `git diff --check`: exit 0 (only Git's existing LF-to-CRLF checkout notices).
 
 `tsconfig.tsbuildinfo` remains an unrelated untracked generated file and is excluded from the commit.
+
+## Fix round 1: retry timer, clean baseline, and response payload
+
+### Findings addressed
+
+- Retry now clears the effect-owned debounce timer before starting immediately. `saveValue` rejects aborted or non-current controllers before entering `saving`, so a stale timer cannot leave the field stuck.
+- Restoring failed text to the last successful baseline clears the visible state to `idle`, removes error/retry UI, cancels pending work, and performs no extra request. Dirty-to-dirty edits intentionally retain retry during the new debounce window.
+- A 2xx response is successful only when its JSON body contains an `updatedAt` string exactly matching the server's `Date#toISOString()` representation. Empty, HTML, missing-field, and invalid-date payloads retain dirty text and expose retry.
+- Supersession coverage explicitly captures the old request signal and asserts it is aborted.
+
+### RED/GREEN evidence
+
+Command for each cycle:
+
+```powershell
+npm.cmd test -- tests/unit/autosave-field.test.tsx
+```
+
+- Retry/timer RED: 1 failed, 6 passed; the stale aborted timer entered `saving` and never recovered. GREEN: 7/7 passed after centralizing timer cleanup and guarding controller identity before save.
+- Baseline RED: 1 failed, 7 passed; error/retry remained after restoring the saved text. GREEN: 8/8 passed after clean-baseline state normalization.
+- Payload RED: 4 failed, 8 passed; all malformed 2xx payloads incorrectly displayed `已保存`. GREEN: 12/12 passed after response JSON validation.
+
+### Fix verification
+
+- Related autosave, route, workspace, and persistence tests: 4 files passed, 34 tests passed.
+- Focused autosave tests: 1 file passed, 12 tests passed.
+- Full `npm.cmd test`: 8 files passed, 57 tests passed.
+- `npm.cmd run lint`: exit 0.
+- `npm.cmd run build`: exit 0; TypeScript passed and `/api/responses` remains dynamic.
+- `git diff --check`: exit 0 (only Git's existing LF-to-CRLF checkout notices).
+- Independent read-only review: Ready — Yes, no Critical or Important findings.
