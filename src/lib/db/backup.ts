@@ -110,8 +110,7 @@ function sameFileIdentity(left: string, right: string) {
 }
 
 function fileIdentity(path: string): FileIdentity {
-  const stats = statSync(path, { bigint: true });
-  return { dev: stats.dev, ino: stats.ino };
+  return backupFileOps.identity(path);
 }
 
 function requireOwnedIdentity(
@@ -164,6 +163,7 @@ function safeRename(
     throw new Error(`${label} destination already exists: ${destination}`);
   }
   backupFileOps.rename(source, destination);
+  backupFileOps.afterRename(source, destination);
 }
 
 function safeRemove(
@@ -309,6 +309,24 @@ export function verifyBackup(path: string): {
   }
 }
 
+function verifyBoundBackup(path: string) {
+  const canonical = requireExistingRealFile(
+    BACKUP_DIRECTORY,
+    path,
+    "Backup source before verification",
+  );
+  const identity = fileIdentity(canonical);
+  const verification = verifyBackup(canonical);
+  backupFileOps.afterVerifySource(canonical);
+  requireExistingRealFile(
+    BACKUP_DIRECTORY,
+    canonical,
+    "Backup source after verification",
+  );
+  requireOwnedIdentity(canonical, identity, "Backup source after verification");
+  return { canonical, identity, verification };
+}
+
 function pruneVerifiedAutomaticBackups(
   source: DatabaseSync,
   backupDir: string,
@@ -371,16 +389,16 @@ export async function createVerifiedBackup(
   requireRealMapping(BACKUP_DIRECTORY, directory, "Backup directory");
   mkdirSync(directory, { recursive: true });
   requireRealMapping(BACKUP_DIRECTORY, directory, "Backup directory");
-  const reservation = reserveBackupPath(directory);
-  const destination = requireDirectSibling(
-    directory,
-    reservation.path,
-    "Backup path",
-  );
-  const sourceIdentity = fileIdentity(sourcePath);
   let source: DatabaseSync | undefined;
   let recorded = false;
+  const reservation = reserveBackupPath(directory);
   try {
+    const destination = requireDirectSibling(
+      directory,
+      reservation.path,
+      "Backup path",
+    );
+    const sourceIdentity = fileIdentity(sourcePath);
     backupFileOps.afterReserve(destination);
     requireSafeParent(BACKUP_DIRECTORY, destination, "Backup path");
     if (!backupFileOps.owns(destination, reservation.identity)) {
@@ -407,12 +425,12 @@ export async function createVerifiedBackup(
   } catch (error) {
     if (
       !recorded &&
-      existsSync(destination) &&
-      backupFileOps.owns(destination, reservation.identity)
+      existsSync(reservation.path) &&
+      backupFileOps.owns(reservation.path, reservation.identity)
     ) {
       safeRemove(
         BACKUP_DIRECTORY,
-        destination,
+        reservation.path,
         reservation.identity,
         "Failed backup",
       );
@@ -503,6 +521,25 @@ function removeInstalledTargetAndRollback(
   }
 }
 
+function removeInstalledTargetWithoutRollback(
+  target: string,
+  installedIdentity: FileIdentity,
+) {
+  try {
+    safeRemove(
+      DATA_DIRECTORY,
+      target,
+      installedIdentity,
+      "Failed installed restore target",
+    );
+  } catch (error) {
+    throw new Error(
+      `Could not remove failed installed restore target ${target}. Owned identity dev=${installedIdentity.dev} ino=${installedIdentity.ino}. ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 export async function restoreBackup(options: {
   source: string;
   target: string;
@@ -530,8 +567,8 @@ export async function restoreBackup(options: {
   if (liveWebsiteProcess()) {
     throw new Error("Refusing restore while the website process is running");
   }
-  verifyBackup(source);
-  const verifiedSourceIdentity = fileIdentity(source);
+  const verifiedSource = verifyBoundBackup(source);
+  const verifiedSourceIdentity = verifiedSource.identity;
   verifyNoSidecars(target, "Restore target");
 
   const targetDirectory = dirname(target);
@@ -619,6 +656,11 @@ export async function restoreBackup(options: {
           previous,
           previousIdentity,
         );
+      } else if (
+        existsSync(target) &&
+        backupFileOps.owns(target, temporaryIdentity)
+      ) {
+        removeInstalledTargetWithoutRollback(target, temporaryIdentity);
       }
       movedPrevious = false;
       throw error;

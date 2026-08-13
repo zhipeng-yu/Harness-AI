@@ -23,6 +23,13 @@ export const backupFileOps = {
     void source;
     void destination;
   },
+  afterVerifySource(path: string) {
+    void path;
+  },
+  afterRename(source: string, destination: string) {
+    void source;
+    void destination;
+  },
   beforeRename(source: string, destination: string) {
     void source;
     void destination;
@@ -46,6 +53,10 @@ export const backupFileOps = {
     } catch {
       return false;
     }
+  },
+  identity(path: string): FileIdentity {
+    const stats = statSync(path, { bigint: true });
+    return { dev: stats.dev, ino: stats.ino };
   },
   copyExclusive(source: string, destination: string) {
     copyFileSync(source, destination, constants.COPYFILE_EXCL);

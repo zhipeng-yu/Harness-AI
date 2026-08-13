@@ -423,6 +423,30 @@ describe("guarded restore", () => {
     expect(existsSync(target)).toBe(false);
   });
 
+  it("binds verification to the source identity captured before verification", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const target = join(dataDir, "harness.sqlite");
+    const sourceDbPath = join(dataDir, "source.sqlite");
+    const replacementDbPath = join(dataDir, "replacement.sqlite");
+    const sourceSeed = seedDatabase(sourceDbPath, "verified source");
+    const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+    closeDatabase(sourceSeed.db);
+    const replacementSeed = seedDatabase(replacementDbPath, "replacement source");
+    const replacement = (await createVerifiedBackup(replacementDbPath, backupDir)).path;
+    closeDatabase(replacementSeed.db);
+    vi.spyOn(backupFileOps, "afterVerifySource").mockImplementation(() => {
+      unlinkSync(source);
+      linkSync(replacement, source);
+    });
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow(
+      /identity|changed|source/i,
+    );
+
+    expect(existsSync(target)).toBe(false);
+  });
+
   it("rejects a target parent swapped to an external junction immediately before copy", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
@@ -842,6 +866,59 @@ describe("guarded restore", () => {
     expect(readdirSync(backupDir)).toEqual([]);
   });
 
+  it("cleans its reservation when source identity lookup fails immediately after reservation", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const sourcePath = join(dataDir, "harness.sqlite");
+    const seeded = seedDatabase(sourcePath);
+    closeDatabase(seeded.db);
+    const identity = backupFileOps.identity;
+    vi.spyOn(backupFileOps, "identity").mockImplementation((path) => {
+      if (path === sourcePath) throw new Error("injected source identity failure");
+      return identity(path);
+    });
+
+    await expect(createVerifiedBackup(sourcePath, backupDir)).rejects.toThrow(
+      "injected source identity failure",
+    );
+
+    expect(readdirSync(backupDir)).toEqual([]);
+  });
+
+  it("removes its installed candidate when post-install verification fails without an old target", async () => {
+    const setup = await setupMissingTargetRestore();
+    vi.spyOn(backupFileOps, "afterRename").mockImplementation((from, to) => {
+      if (basename(from).startsWith(`.${basename(setup.target)}.restore-`)) {
+        writeFileSync(to, "corrupted installed candidate");
+      }
+    });
+
+    await expect(
+      restoreBackup({ source: setup.source, target: setup.target, confirm: true }),
+    ).rejects.toThrow();
+
+    expect(existsSync(setup.target)).toBe(false);
+  });
+
+  it("reports the owned installed candidate when removal fails without an old target", async () => {
+    const setup = await setupMissingTargetRestore();
+    vi.spyOn(backupFileOps, "afterRename").mockImplementation((from, to) => {
+      if (basename(from).startsWith(`.${basename(setup.target)}.restore-`)) {
+        writeFileSync(to, "corrupted installed candidate");
+      }
+    });
+    vi.spyOn(backupFileOps, "remove").mockImplementation((path) => {
+      if (path === setup.target) throw new Error("injected installed remove failure");
+      rmSync(path);
+    });
+
+    await expect(
+      restoreBackup({ source: setup.source, target: setup.target, confirm: true }),
+    ).rejects.toThrow(new RegExp(`${escapeRegex(setup.target)}.*dev.*ino`, "i"));
+
+    expect(existsSync(setup.target)).toBe(true);
+  });
+
   it("cleans its reserved backup when source open fails after reservation", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
@@ -980,6 +1057,16 @@ async function setupRestoreWithoutRuntime() {
   const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
   closeDatabase(sourceSeed.db);
   return { target, source };
+}
+
+async function setupMissingTargetRestore() {
+  const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+  const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+  const sourceDbPath = join(dataDir, "source.sqlite");
+  const sourceSeed = seedDatabase(sourceDbPath, "source answer");
+  const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+  closeDatabase(sourceSeed.db);
+  return { source, target: join(dataDir, "missing-target.sqlite") };
 }
 
 function escapeRegex(value: string) {
