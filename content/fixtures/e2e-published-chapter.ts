@@ -1,6 +1,9 @@
 import type { ChapterDefinition } from "../schema";
 
-export const publishedChapterFixture: ChapterDefinition = {
+export const publishedChapterFixture: Extract<
+  ChapterDefinition,
+  { status: "published" }
+> = {
   id: "chapter-01",
   slug: "chapter-01",
   order: 1,

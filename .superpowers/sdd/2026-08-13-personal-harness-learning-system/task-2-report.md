@@ -131,3 +131,37 @@ Validated 18 chapters (0 published).
 ```
 
 Lint and `diff --check` both exited 0.
+
+## Follow-up — Published fixture type narrowing
+
+### Change
+
+- Narrowed `publishedChapterFixture` from the complete `ChapterDefinition` union to its `published` member with `Extract<ChapterDefinition, { status: "published" }>`.
+- This preserves the same fixture data and runtime schema assertions while allowing the existing tests to access `reflectionPrompts` and `problem` without `any` or disabled type checking.
+
+### RED
+
+Command:
+
+```powershell
+npm.cmd exec tsc -- --noEmit
+```
+
+Key output before the type-only fix:
+
+```text
+tests/unit/content-schema.test.ts(27,13): error TS2339: Property 'reflectionPrompts' does not exist on type ...
+tests/unit/content-schema.test.ts(51,42): error TS2339: Property 'problem' does not exist on type ...
+```
+
+### GREEN
+
+Commands:
+
+```powershell
+npm.cmd test -- tests/unit/content-schema.test.ts
+npm.cmd exec tsc -- --noEmit
+npm.cmd run lint
+```
+
+Key output: the focused suite passed 7/7; TypeScript and ESLint exited 0 with no errors.
