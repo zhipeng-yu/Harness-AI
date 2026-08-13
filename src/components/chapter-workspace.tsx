@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChapterDefinition } from "@/content/schema";
 import type { ActionPlan } from "@/src/features/actions/repository";
 import type { ArtifactStatus, LearningStage } from "@/src/types/learning";
+import { AutosaveField } from "./autosave-field";
 import { ProgressStepper } from "./progress-stepper";
 
 type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
@@ -95,10 +96,13 @@ export function ChapterWorkspace({
         <section>
           <h2>照见自己</h2>
           {chapter.reflectionPrompts.map((prompt) => (
-            <div key={prompt.id}>
-              <h3>{prompt.question}</h3>
-              <p>{savedResponses[prompt.id] || "尚未回答"}</p>
-            </div>
+            <AutosaveField
+              key={prompt.id}
+              chapterId={chapter.id}
+              promptId={prompt.id}
+              label={prompt.question}
+              initialValue={savedResponses[prompt.id] ?? ""}
+            />
           ))}
         </section>
 

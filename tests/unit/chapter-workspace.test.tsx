@@ -35,6 +35,26 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
+  it("renders saved reflection responses as editable autosave fields", () => {
+    const prompt = publishedChapterFixture.reflectionPrompts[0];
+    render(
+      <ChapterWorkspace
+        chapter={publishedChapterFixture}
+        learningStage="understanding"
+        savedResponses={{ [prompt.id]: "已经保存的回答" }}
+        actionPlan={null}
+        artifact={null}
+      />,
+    );
+
+    expect(screen.getAllByRole("textbox")).toHaveLength(
+      publishedChapterFixture.reflectionPrompts.length,
+    );
+    expect(screen.getByRole("textbox", { name: prompt.question })).toHaveValue(
+      "已经保存的回答",
+    );
+  });
+
   it("records understanding once when a chapter has no progress", async () => {
     render(
       <ChapterWorkspace
