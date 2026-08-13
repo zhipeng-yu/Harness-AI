@@ -10,9 +10,10 @@ import {
   writeFileSync,
   symlinkSync,
   linkSync,
+  unlinkSync,
 } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
-import { basename, extname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -31,6 +32,7 @@ import { migrate } from "@/src/lib/db/migrate";
 const projectRoot = resolve(process.cwd());
 const dataRoot = join(projectRoot, "data");
 const backupRoot = join(projectRoot, "backups");
+const runtimeRoot = join(projectRoot, ".runtime");
 const cleanupPaths: string[] = [];
 const externalCleanupPaths: string[] = [];
 const databases: DatabaseSync[] = [];
@@ -52,10 +54,13 @@ function assertCleanupBoundary(path: string) {
   const absolute = resolve(path);
   const inData = relative(dataRoot, absolute);
   const inBackups = relative(backupRoot, absolute);
+  const inRuntime = relative(runtimeRoot, absolute);
   const isChild = (candidate: string) =>
     candidate !== "" && candidate !== ".." && !candidate.startsWith(`..${sep}`);
-  if (!isChild(inData) && !isChild(inBackups)) {
-    throw new Error(`Refusing test cleanup outside project data/backups: ${absolute}`);
+  if (!isChild(inData) && !isChild(inBackups) && !isChild(inRuntime)) {
+    throw new Error(
+      `Refusing test cleanup outside project data/backups/runtime: ${absolute}`,
+    );
   }
 }
 
@@ -392,6 +397,55 @@ describe("guarded restore", () => {
     expect(readResponse(target)).toBe("必须精确保留的回答");
   });
 
+  it("rejects a source file swapped after verification and before copy", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const target = join(dataDir, "harness.sqlite");
+    const sourceDbPath = join(dataDir, "source.sqlite");
+    const replacementDbPath = join(dataDir, "replacement.sqlite");
+    const sourceSeed = seedDatabase(sourceDbPath, "verified source");
+    const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+    closeDatabase(sourceSeed.db);
+    const replacementSeed = seedDatabase(replacementDbPath, "swapped source");
+    const replacement = (await createVerifiedBackup(replacementDbPath, backupDir)).path;
+    closeDatabase(replacementSeed.db);
+    const beforeCopy = backupFileOps.beforeCopy;
+    vi.spyOn(backupFileOps, "beforeCopy").mockImplementation((from, to) => {
+      beforeCopy(from, to);
+      unlinkSync(source);
+      linkSync(replacement, source);
+    });
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow(
+      /identity|changed|source/i,
+    );
+
+    expect(existsSync(target)).toBe(false);
+  });
+
+  it("rejects a target parent swapped to an external junction immediately before copy", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const targetParent = join(dataDir, "target-parent");
+    mkdirSync(targetParent);
+    const target = join(targetParent, "harness.sqlite");
+    const external = makeExternalTemp("task9-external-");
+    const sourceDbPath = join(dataDir, "source.sqlite");
+    const sourceSeed = seedDatabase(sourceDbPath);
+    const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+    closeDatabase(sourceSeed.db);
+    vi.spyOn(backupFileOps, "beforeCopy").mockImplementation(() => {
+      rmSync(targetParent, { recursive: true });
+      symlinkSync(external, targetParent, "junction");
+    });
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow(
+      /junction|boundary|parent/i,
+    );
+
+    expect(readdirSync(external)).toEqual([]);
+  });
+
   it("makes a verified pre_restore backup before replacing an existing target", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
@@ -687,7 +741,14 @@ describe("guarded restore", () => {
     const source = (await createVerifiedBackup(sourceDb, backupDir)).path;
     closeDatabase(seededSource.db);
     const before = readFileSync(target);
-    vi.spyOn(backupRuntimeOps, "stateExists").mockReturnValue(true);
+    mkdirSync(runtimeRoot, { recursive: true });
+    const runtimeDir = makeProjectTemp(runtimeRoot, "task9-runtime-");
+    const statePath = join(runtimeDir, "server.json");
+    writeFileSync(
+      statePath,
+      JSON.stringify({ pid: process.pid, startTime: currentProcessStartTime() }),
+    );
+    vi.spyOn(backupRuntimeOps, "statePath").mockReturnValue(statePath);
     vi.spyOn(backupRuntimeOps, "readState").mockImplementation(() => {
       const error = new Error("access denied") as NodeJS.ErrnoException;
       error.code = "EACCES";
@@ -699,6 +760,101 @@ describe("guarded restore", () => {
     );
 
     expect(readFileSync(target)).toEqual(before);
+  });
+
+  it("allows restore only when runtime lstat reports ENOENT", async () => {
+    const setup = await setupRestoreWithoutRuntime();
+    vi.spyOn(backupRuntimeOps, "lstatState").mockImplementation(() => {
+      const error = new Error("missing") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      throw error;
+    });
+
+    await restoreBackup({ source: setup.source, target: setup.target, confirm: true });
+
+    expect(readResponse(setup.target)).toBe("unused source");
+  });
+
+  it("fails closed when runtime lstat reports EACCES", async () => {
+    const setup = await setupRestoreWithoutRuntime();
+    const before = readFileSync(setup.target);
+    vi.spyOn(backupRuntimeOps, "lstatState").mockImplementation(() => {
+      const error = new Error("access denied") as NodeJS.ErrnoException;
+      error.code = "EACCES";
+      throw error;
+    });
+
+    await expect(
+      restoreBackup({ source: setup.source, target: setup.target, confirm: true }),
+    ).rejects.toThrow(/runtime state|server\.json|access/i);
+
+    expect(readFileSync(setup.target)).toEqual(before);
+  });
+
+  it("cleans its temporary restore file when candidate verification fails", async () => {
+    const setup = await setupRestoreFailureFiles();
+    vi.spyOn(backupFileOps, "afterCopy").mockImplementation((_from, temporary) => {
+      writeFileSync(temporary, "corrupt candidate");
+    });
+
+    await expect(
+      restoreBackup({ source: setup.source, target: setup.target, confirm: true }),
+    ).rejects.toThrow();
+
+    expect(readResponse(setup.target)).toBe("old target answer");
+    expect(readdirSync(dirname(setup.target)).filter((name) => name.includes(".restore-")))
+      .toEqual([]);
+  });
+
+  it("cleans its temporary restore file when copied candidate verification fails without a target", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const sourceDbPath = join(dataDir, "source.sqlite");
+    const sourceSeed = seedDatabase(sourceDbPath, "source answer");
+    const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+    closeDatabase(sourceSeed.db);
+    const target = join(dataDir, "missing-target.sqlite");
+    vi.spyOn(backupFileOps, "afterCopy").mockImplementation((_from, temporary) => {
+      writeFileSync(temporary, "corrupt candidate");
+    });
+
+    await expect(restoreBackup({ source, target, confirm: true })).rejects.toThrow();
+
+    expect(existsSync(target)).toBe(false);
+    expect(readdirSync(dataDir).filter((name) => name.includes(".restore-")))
+      .toEqual([]);
+  });
+
+  it("cleans its reservation when a post-reservation check fails", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const sourcePath = join(dataDir, "harness.sqlite");
+    const seeded = seedDatabase(sourcePath);
+    closeDatabase(seeded.db);
+    vi.spyOn(backupFileOps, "afterReserve").mockImplementation(() => {
+      throw new Error("injected post-reservation failure");
+    });
+
+    await expect(createVerifiedBackup(sourcePath, backupDir)).rejects.toThrow(
+      "injected post-reservation failure",
+    );
+
+    expect(readdirSync(backupDir)).toEqual([]);
+  });
+
+  it("cleans its reserved backup when source open fails after reservation", async () => {
+    const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+    const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+    const sourcePath = join(dataDir, "harness.sqlite");
+    const seeded = seedDatabase(sourcePath);
+    closeDatabase(seeded.db);
+    vi.spyOn(backupFileOps, "afterReserve").mockImplementation(() => {
+      unlinkSync(sourcePath);
+    });
+
+    await expect(createVerifiedBackup(sourcePath, backupDir)).rejects.toThrow();
+
+    expect(readdirSync(backupDir)).toEqual([]);
   });
 });
 
@@ -811,6 +967,19 @@ async function setupRestoreFailureFiles() {
     source,
     rollback: join(dataDir, "harness.pre-restore.sqlite"),
   };
+}
+
+async function setupRestoreWithoutRuntime() {
+  const dataDir = makeProjectTemp(dataRoot, "task9-data-");
+  const backupDir = makeProjectTemp(backupRoot, "task9-backups-");
+  const target = join(dataDir, "harness.sqlite");
+  const sourceDbPath = join(dataDir, "source.sqlite");
+  const targetSeed = seedDatabase(target, "unchanged target");
+  closeDatabase(targetSeed.db);
+  const sourceSeed = seedDatabase(sourceDbPath, "unused source");
+  const source = (await createVerifiedBackup(sourceDbPath, backupDir)).path;
+  closeDatabase(sourceSeed.db);
+  return { target, source };
 }
 
 function escapeRegex(value: string) {

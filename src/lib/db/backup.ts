@@ -5,7 +5,6 @@ import {
   mkdirSync,
   realpathSync,
   readdirSync,
-  rmSync,
   statSync,
 } from "node:fs";
 import {
@@ -110,6 +109,21 @@ function sameFileIdentity(left: string, right: string) {
   return leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino;
 }
 
+function fileIdentity(path: string): FileIdentity {
+  const stats = statSync(path, { bigint: true });
+  return { dev: stats.dev, ino: stats.ino };
+}
+
+function requireOwnedIdentity(
+  path: string,
+  identity: FileIdentity,
+  label: string,
+) {
+  if (!backupFileOps.owns(path, identity)) {
+    throw new Error(`${label} file identity changed: ${path}`);
+  }
+}
+
 function requireAtOrWithin(root: string, candidate: string, label: string) {
   const absoluteRoot = resolve(root);
   const absolute = resolve(candidate);
@@ -134,6 +148,35 @@ function requireSafeParent(root: string, candidate: string, label: string) {
   requireRealMapping(root, parent, `${label} parent`);
   if (!existsSync(parent)) throw new Error(`${label} parent does not exist`);
   return absolute;
+}
+
+function safeRename(
+  source: string,
+  sourceIdentity: FileIdentity,
+  destination: string,
+  label: string,
+) {
+  backupFileOps.beforeRename(source, destination);
+  requireExistingRealFile(DATA_DIRECTORY, source, `${label} source`);
+  requireOwnedIdentity(source, sourceIdentity, `${label} source`);
+  requireSafeParent(DATA_DIRECTORY, destination, `${label} destination`);
+  if (existsSync(destination)) {
+    throw new Error(`${label} destination already exists: ${destination}`);
+  }
+  backupFileOps.rename(source, destination);
+}
+
+function safeRemove(
+  root: string,
+  path: string,
+  identity: FileIdentity,
+  label: string,
+) {
+  backupFileOps.beforeRemove(path);
+  requireExistingRealFile(root, path, label);
+  requireOwnedIdentity(path, identity, label);
+  requireSafeParent(root, path, label);
+  backupFileOps.remove(path);
 }
 
 function pad(value: number) {
@@ -296,8 +339,12 @@ function pruneVerifiedAutomaticBackups(
     if (!/^harness-\d{8}-\d{6}\.sqlite$/.test(basename(candidate))) continue;
     if (existsSync(candidate)) {
       requireExistingRealFile(BACKUP_DIRECTORY, candidate, "Pruned backup");
-      requireSafeParent(BACKUP_DIRECTORY, candidate, "Pruned backup");
-      rmSync(candidate);
+      safeRemove(
+        BACKUP_DIRECTORY,
+        candidate,
+        fileIdentity(candidate),
+        "Pruned backup",
+      );
     }
     deleteRecord.run(record.id);
   }
@@ -330,13 +377,18 @@ export async function createVerifiedBackup(
     reservation.path,
     "Backup path",
   );
-  requireSafeParent(BACKUP_DIRECTORY, destination, "Backup path");
-  const source = new DatabaseSync(sourcePath, { timeout: 5_000 });
+  const sourceIdentity = fileIdentity(sourcePath);
+  let source: DatabaseSync | undefined;
   let recorded = false;
   try {
+    backupFileOps.afterReserve(destination);
+    requireSafeParent(BACKUP_DIRECTORY, destination, "Backup path");
     if (!backupFileOps.owns(destination, reservation.identity)) {
       throw new Error(`Lost ownership of reserved backup path: ${destination}`);
     }
+    requireExistingRealFile(DATA_DIRECTORY, sourcePath, "Database before backup");
+    requireOwnedIdentity(sourcePath, sourceIdentity, "Database before backup");
+    source = new DatabaseSync(sourcePath, { timeout: 5_000 });
     await backup(source, destination);
     if (!backupFileOps.owns(destination, reservation.identity)) {
       throw new Error(`Backup path identity changed during creation: ${destination}`);
@@ -358,26 +410,41 @@ export async function createVerifiedBackup(
       existsSync(destination) &&
       backupFileOps.owns(destination, reservation.identity)
     ) {
-      requireExistingRealFile(BACKUP_DIRECTORY, destination, "Failed backup");
-      requireSafeParent(BACKUP_DIRECTORY, destination, "Failed backup");
-      rmSync(destination);
+      safeRemove(
+        BACKUP_DIRECTORY,
+        destination,
+        reservation.identity,
+        "Failed backup",
+      );
     }
     throw error;
   } finally {
-    source.close();
+    source?.close();
   }
 }
 
 function liveWebsiteProcess() {
-  if (!backupRuntimeOps.stateExists()) return false;
-  let statePath = resolve(SERVER_STATE_PATH);
+  const requestedStatePath = backupRuntimeOps.statePath();
+  try {
+    const state = backupRuntimeOps.lstatState(requestedStatePath);
+    if (!state.isFile()) {
+      throw new Error(`Runtime state is not a regular file: ${requestedStatePath}`);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw new Error(
+      `Cannot safely inspect runtime state ${requestedStatePath}: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+  let statePath = resolve(requestedStatePath);
   try {
     statePath = requireExistingRealFile(
       dirname(SERVER_STATE_PATH),
-      SERVER_STATE_PATH,
+      requestedStatePath,
       "Runtime server.json",
     );
-    const record = JSON.parse(backupRuntimeOps.readState()) as {
+    const record = JSON.parse(backupRuntimeOps.readState(statePath)) as {
       pid?: unknown;
       startTime?: unknown;
     };
@@ -405,17 +472,28 @@ function liveWebsiteProcess() {
   }
 }
 
-function removeInstalledTargetAndRollback(target: string, previous: string) {
+function removeInstalledTargetAndRollback(
+  target: string,
+  installedIdentity: FileIdentity,
+  previous: string,
+  previousIdentity: FileIdentity,
+) {
   try {
     if (existsSync(target)) {
-      requireExistingRealFile(DATA_DIRECTORY, target, "Failed restore target");
-      requireSafeParent(DATA_DIRECTORY, target, "Failed restore target");
-      backupFileOps.remove(target);
+      safeRemove(
+        DATA_DIRECTORY,
+        target,
+        installedIdentity,
+        "Failed restore target",
+      );
     }
     if (existsSync(previous)) {
-      requireExistingRealFile(DATA_DIRECTORY, previous, "Restore rollback");
-      requireSafeParent(DATA_DIRECTORY, previous, "Restore rollback");
-      backupFileOps.rename(previous, target);
+      safeRename(
+        previous,
+        previousIdentity,
+        target,
+        "Restore rollback",
+      );
     }
   } catch (error) {
     throw new Error(
@@ -453,6 +531,7 @@ export async function restoreBackup(options: {
     throw new Error("Refusing restore while the website process is running");
   }
   verifyBackup(source);
+  const verifiedSourceIdentity = fileIdentity(source);
   verifyNoSidecars(target, "Restore target");
 
   const targetDirectory = dirname(target);
@@ -479,35 +558,91 @@ export async function restoreBackup(options: {
     throw new Error(`Restore rollback path already exists: ${previous}`);
   }
 
-  backupFileOps.copyExclusive(source, temporary);
-  if (preRestore) {
-    addVerifiedBackupRecord(temporary, preRestore.path, "pre_restore");
-    verifyBackup(temporary);
-  }
+  let temporaryIdentity: FileIdentity | undefined;
   let movedPrevious = false;
+  let previousIdentity: FileIdentity | undefined;
   try {
+    backupFileOps.beforeCopy(source, temporary);
+    requireExistingRealFile(
+      BACKUP_DIRECTORY,
+      source,
+      "Backup source immediately before copy",
+    );
+    requireOwnedIdentity(
+      source,
+      verifiedSourceIdentity,
+      "Backup source immediately before copy",
+    );
+    requireSafeParent(
+      DATA_DIRECTORY,
+      temporary,
+      "Restore temporary immediately before copy",
+    );
+    if (existsSync(temporary)) {
+      throw new Error(`Restore temporary path already exists: ${temporary}`);
+    }
+    backupFileOps.copyExclusive(source, temporary);
+    temporaryIdentity = fileIdentity(temporary);
+    backupFileOps.afterCopy(source, temporary);
+    requireExistingRealFile(DATA_DIRECTORY, temporary, "Restore candidate");
+    requireOwnedIdentity(temporary, temporaryIdentity, "Restore candidate");
+    if (preRestore) {
+      addVerifiedBackupRecord(temporary, preRestore.path, "pre_restore");
+    }
+    verifyBackup(temporary);
+    requireOwnedIdentity(
+      temporary,
+      temporaryIdentity,
+      "Verified restore candidate",
+    );
+
     if (existsSync(target)) {
-      backupFileOps.rename(target, previous);
+      requireExistingRealFile(DATA_DIRECTORY, target, "Restore target before rename");
+      previousIdentity = fileIdentity(target);
+      safeRename(target, previousIdentity, previous, "Preserve restore target");
       movedPrevious = true;
     }
     try {
-      backupFileOps.rename(temporary, target);
+      safeRename(
+        temporary,
+        temporaryIdentity,
+        target,
+        "Install restore candidate",
+      );
       verifyBackup(target);
+      requireOwnedIdentity(target, temporaryIdentity, "Installed restore target");
     } catch (error) {
-      removeInstalledTargetAndRollback(target, previous);
+      if (movedPrevious && previousIdentity) {
+        removeInstalledTargetAndRollback(
+          target,
+          temporaryIdentity,
+          previous,
+          previousIdentity,
+        );
+      }
       movedPrevious = false;
       throw error;
     }
-    if (movedPrevious) {
-      requireExistingRealFile(DATA_DIRECTORY, previous, "Restore rollback");
-      requireSafeParent(DATA_DIRECTORY, previous, "Restore rollback");
-      backupFileOps.remove(previous);
+    if (movedPrevious && previousIdentity) {
+      safeRemove(
+        DATA_DIRECTORY,
+        previous,
+        previousIdentity,
+        "Restore rollback",
+      );
     }
   } finally {
-    if (existsSync(temporary)) {
-      requireExistingRealFile(DATA_DIRECTORY, temporary, "Restore temporary file");
-      requireSafeParent(DATA_DIRECTORY, temporary, "Restore temporary file");
-      backupFileOps.remove(temporary);
+    if (
+      temporaryIdentity &&
+      existsSync(temporary) &&
+      backupFileOps.owns(temporary, temporaryIdentity)
+    ) {
+      safeRemove(
+        DATA_DIRECTORY,
+        temporary,
+        temporaryIdentity,
+        "Restore temporary file",
+      );
     }
   }
 }

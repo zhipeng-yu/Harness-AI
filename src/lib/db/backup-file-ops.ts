@@ -12,6 +12,24 @@ import {
 export type FileIdentity = { dev: bigint; ino: bigint };
 
 export const backupFileOps = {
+  afterReserve(path: string) {
+    void path;
+  },
+  beforeCopy(source: string, destination: string) {
+    void source;
+    void destination;
+  },
+  afterCopy(source: string, destination: string) {
+    void source;
+    void destination;
+  },
+  beforeRename(source: string, destination: string) {
+    void source;
+    void destination;
+  },
+  beforeRemove(path: string) {
+    void path;
+  },
   reserve(path: string): FileIdentity {
     const descriptor = openSync(path, "wx");
     try {

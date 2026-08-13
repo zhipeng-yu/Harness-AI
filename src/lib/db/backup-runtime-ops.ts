@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { SERVER_STATE_PATH } from "@/src/lib/paths";
 
@@ -7,11 +7,14 @@ export type ProcessIdentity =
   | { status: "dead" };
 
 export const backupRuntimeOps = {
-  stateExists() {
-    return existsSync(SERVER_STATE_PATH);
+  statePath() {
+    return SERVER_STATE_PATH;
   },
-  readState() {
-    return readFileSync(SERVER_STATE_PATH, "utf8");
+  lstatState(path: string) {
+    return lstatSync(path);
+  },
+  readState(path: string) {
+    return readFileSync(path, "utf8");
   },
   inspectProcess(pid: number): ProcessIdentity {
     if (process.platform !== "win32") {
