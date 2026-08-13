@@ -31,7 +31,7 @@ export function ChapterMap({
   const reviewed = new Set(reviewedChapterIds);
 
   return (
-    <ol aria-label="18 章成长地图">
+    <ol className="chapter-map" aria-label="18 章成长地图">
       {chapters.map((chapter) => {
         if (chapter.status === "awaiting_audio") {
           return (

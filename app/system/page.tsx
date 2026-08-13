@@ -40,7 +40,7 @@ export default function SystemPage() {
     for (const artifact of artifacts) groups[artifact.status].push(artifact);
 
     return (
-      <main>
+      <main className="page page--system">
         <h1>我的系统</h1>
         <p>查看从实践到复盘沉淀下来的个人 Harness System。</p>
         {artifacts.length === 0 ? <p>尚未创建系统模块。</p> : null}

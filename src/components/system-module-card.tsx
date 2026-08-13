@@ -23,7 +23,7 @@ export function SystemModuleCard({ module: artifact }: Readonly<{ module: Artifa
   )[0];
 
   return (
-    <article>
+    <article className="system-module">
       <h3>{artifact.title}</h3>
       <dl>
         <div>

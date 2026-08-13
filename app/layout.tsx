@@ -14,7 +14,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     <html lang="zh-CN">
       <body>
         <AppShell>
-          <nav aria-label="主导航">
+          <nav className="primary-nav" aria-label="主导航">
             <Link href="/">我的首页</Link>
             <Link href="/chapters">18章地图</Link>
             <Link href="/system">我的系统</Link>

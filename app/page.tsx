@@ -53,13 +53,13 @@ export default function HomePage() {
     });
 
     return (
-      <main>
+      <main className="page page--home">
         <h1>超体 · 我的成长操作系统</h1>
         <p>把课程理解转化为行动、创造与复盘。</p>
 
         <RecommendationCard action={action} chapters={chapters} />
 
-        <section aria-labelledby="open-loop-heading">
+        <section className="open-loop" aria-labelledby="open-loop-heading">
           <h2 id="open-loop-heading">尚未形成闭环</h2>
           <dl>
             <div>
@@ -77,7 +77,7 @@ export default function HomePage() {
           </dl>
         </section>
 
-        <section aria-labelledby="chapter-map-heading">
+        <section className="chapter-map-section" aria-labelledby="chapter-map-heading">
           <h2 id="chapter-map-heading">18 章成长地图</h2>
           <ChapterMap
             chapters={chapters}

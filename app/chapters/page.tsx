@@ -30,7 +30,7 @@ export default function ChaptersPage() {
       .all(OWNER_ID) as ArtifactChapterSummary[];
 
     return (
-      <main>
+      <main className="page page--chapters">
         <h1>18 章成长地图</h1>
         <p>推荐顺序不会锁定导航，你可以随时查看任何已发布章节。</p>
         <ChapterMap

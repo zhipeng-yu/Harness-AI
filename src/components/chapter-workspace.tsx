@@ -117,7 +117,7 @@ export function ChapterWorkspace({
       </aside>
 
       <article className="chapter-workspace__content">
-        <p>第 {chapter.order} 章</p>
+        <p className="chapter-workspace__eyebrow">第 {chapter.order} 章</p>
         <h1>{chapter.title}</h1>
         <section>
           <h2>本章要解决的问题</h2>

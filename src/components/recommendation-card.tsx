@@ -18,7 +18,7 @@ export function RecommendationCard({
 }>) {
   if (!action) {
     return (
-      <section aria-labelledby="next-action-heading">
+      <section className="next-action" aria-labelledby="next-action-heading">
         <h2 id="next-action-heading">下一步</h2>
         <p>暂无可推荐的已发布章节。</p>
         <Link href="/chapters">查看 18 章地图</Link>
@@ -28,7 +28,7 @@ export function RecommendationCard({
 
   if (action.kind === "review_artifact") {
     return (
-      <section aria-labelledby="next-action-heading">
+      <section className="next-action" aria-labelledby="next-action-heading">
         <h2 id="next-action-heading">下一步</h2>
         <p>复盘已准备好的 Artifact</p>
         <p>{action.artifactId}</p>
@@ -39,7 +39,7 @@ export function RecommendationCard({
   const chapter = chapters.find((item) => item.id === action.chapterId);
 
   return (
-    <section aria-labelledby="next-action-heading">
+    <section className="next-action" aria-labelledby="next-action-heading">
       <h2 id="next-action-heading">下一步</h2>
       <p>{actionLabels[action.kind]}</p>
       <h3>{chapter?.title ?? action.chapterId}</h3>
