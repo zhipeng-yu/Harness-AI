@@ -77,13 +77,5 @@ CREATE TABLE reviews (
   created_at TEXT NOT NULL
 ) STRICT;
 
-CREATE TABLE backup_records (
-  id TEXT PRIMARY KEY,
-  path TEXT NOT NULL UNIQUE,
-  kind TEXT NOT NULL CHECK (kind IN ('manual', 'automatic', 'pre_restore')),
-  verified_at TEXT NOT NULL,
-  created_at TEXT NOT NULL
-) STRICT;
-
 INSERT OR IGNORE INTO owners (id, display_name, created_at)
 VALUES ('owner-local', '我的成长系统', CURRENT_TIMESTAMP);

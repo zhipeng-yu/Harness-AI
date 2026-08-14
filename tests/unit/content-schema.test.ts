@@ -1,5 +1,5 @@
 import { chapterSchema } from "@/content/schema";
-import { publishedChapterFixture } from "@/content/fixtures/e2e-published-chapter";
+import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
 
 async function loadRegistry(environment: Record<string, string | undefined> = {}) {
   vi.resetModules();
@@ -96,15 +96,15 @@ describe("chapter content contract", () => {
     expect(() => assertChapterRegistry([...chapters, chapters[0]])).toThrow();
   });
 
-  it("uses the published fixture only when both E2E environment variables are set", async () => {
-    const production = await loadRegistry({ HARNESS_E2E: "1" });
+  it("uses the published fixture only when both test environment variables are set", async () => {
+    const production = await loadRegistry({ HARNESS_TEST: "1" });
     expect(production.getChapters()[0].status).toBe("awaiting_audio");
 
-    const e2e = await loadRegistry({
-      HARNESS_E2E: "1",
+    const testRegistry = await loadRegistry({
+      HARNESS_TEST: "1",
       HARNESS_CONTENT_FIXTURE: "published-chapter",
     });
-    const chapters = e2e.getChapters();
+    const chapters = testRegistry.getChapters();
 
     expect(chapters).toHaveLength(18);
     expect(chapters[0]).toEqual(publishedChapterFixture);

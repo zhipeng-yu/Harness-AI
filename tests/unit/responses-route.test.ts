@@ -17,14 +17,14 @@ function responseRequest(body: unknown) {
 function usePublishedFixture() {
   const databasePath = join(mkdtempSync(join(tmpdir(), "harness-responses-")), "test.sqlite");
   process.env.HARNESS_DB_PATH = databasePath;
-  process.env.HARNESS_E2E = "1";
+  process.env.HARNESS_TEST = "1";
   process.env.HARNESS_CONTENT_FIXTURE = "published-chapter";
   return databasePath;
 }
 
 afterEach(() => {
   delete process.env.HARNESS_DB_PATH;
-  delete process.env.HARNESS_E2E;
+  delete process.env.HARNESS_TEST;
   delete process.env.HARNESS_CONTENT_FIXTURE;
 });
 

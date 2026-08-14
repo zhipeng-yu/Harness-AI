@@ -54,13 +54,13 @@ beforeEach(() => {
     mkdtempSync(join(tmpdir(), "harness-artifact-routes-")),
     "test.sqlite",
   );
-  process.env.HARNESS_E2E = "1";
+  process.env.HARNESS_TEST = "1";
   process.env.HARNESS_CONTENT_FIXTURE = "published-chapter";
 });
 
 afterEach(() => {
   delete process.env.HARNESS_DB_PATH;
-  delete process.env.HARNESS_E2E;
+  delete process.env.HARNESS_TEST;
   delete process.env.HARNESS_CONTENT_FIXTURE;
 });
 

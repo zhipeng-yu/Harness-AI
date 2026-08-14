@@ -17,7 +17,7 @@ function progressRequest(body: unknown) {
 
 afterEach(() => {
   delete process.env.HARNESS_DB_PATH;
-  delete process.env.HARNESS_E2E;
+  delete process.env.HARNESS_TEST;
   delete process.env.HARNESS_CONTENT_FIXTURE;
 });
 
@@ -60,7 +60,7 @@ describe("PUT /api/progress", () => {
   it("writes published chapter progress for the fixed local owner", async () => {
     const databasePath = join(mkdtempSync(join(tmpdir(), "harness-progress-")), "test.sqlite");
     process.env.HARNESS_DB_PATH = databasePath;
-    process.env.HARNESS_E2E = "1";
+    process.env.HARNESS_TEST = "1";
     process.env.HARNESS_CONTENT_FIXTURE = "published-chapter";
 
     const response = await PUT(

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { publishedChapterFixture } from "@/content/fixtures/e2e-published-chapter";
+import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
 import { ActionPlanForm } from "@/src/components/action-plan-form";
 import { ArtifactEditor } from "@/src/components/artifact-editor";
 import { ArtifactReviewForm } from "@/src/components/artifact-review-form";

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { publishedChapterFixture } from "@/content/fixtures/e2e-published-chapter";
+import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
 import { ChapterWorkspace } from "@/src/components/chapter-workspace";
 
 const progressResponse = {

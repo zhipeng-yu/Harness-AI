@@ -1,9 +1,8 @@
-import { publishedChapterFixture } from "../fixtures/e2e-published-chapter";
+import { publishedChapterFixture } from "../fixtures/published-chapter";
 import { chapterSchema, type ChapterDefinition } from "../schema";
-import { chapter01 } from "./chapter-01";
 
 const awaitingChapters: readonly ChapterDefinition[] = [
-  chapter01,
+  { id: "chapter-01", slug: "chapter-01", order: 1, title: "第1章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-02", slug: "chapter-02", order: 2, title: "第2章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-03", slug: "chapter-03", order: 3, title: "第3章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-04", slug: "chapter-04", order: 4, title: "第4章（等待音频）", status: "awaiting_audio" },
@@ -24,7 +23,7 @@ const awaitingChapters: readonly ChapterDefinition[] = [
 ];
 
 const productionChapters = awaitingChapters.map((chapter) => chapterSchema.parse(chapter));
-const e2ePublishedChapter = chapterSchema.parse(publishedChapterFixture);
+const testPublishedChapter = chapterSchema.parse(publishedChapterFixture);
 
 export function assertChapterRegistry(chapters: readonly ChapterDefinition[]): void {
   const ids = new Set(chapters.map((chapter) => chapter.id));
@@ -46,10 +45,10 @@ assertChapterRegistry(productionChapters);
 
 export function getChapters(): readonly ChapterDefinition[] {
   if (
-    process.env.HARNESS_E2E === "1" &&
+    process.env.HARNESS_TEST === "1" &&
     process.env.HARNESS_CONTENT_FIXTURE === "published-chapter"
   ) {
-    return [e2ePublishedChapter, ...productionChapters.slice(1)];
+    return [testPublishedChapter, ...productionChapters.slice(1)];
   }
 
   return productionChapters;
