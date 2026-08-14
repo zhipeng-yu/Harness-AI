@@ -6,7 +6,7 @@
 - 18 章目录均为 `awaiting_audio`，正式发布内容为 0 章。
 - 核心学习闭环已经完成：课程阅读、个人回答、行动计划、Artifact、实践、复盘、版本迭代和下一步推荐。
 - 正式数据库是 `data/harness.sqlite`；已有数据库和 `backups/` 内备份不得删除、覆盖或用于测试。
-- 精简后的功能基线提交：`5e626c6a760733a547ceba5ede019349672a20de`。
+- 代码仓库是 <https://github.com/zhipeng-yu/Harness-AI>，完成任务后直接推送 `main`。
 
 ## 新窗口的唯一任务
 
