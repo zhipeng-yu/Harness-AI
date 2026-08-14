@@ -25,9 +25,14 @@ const publishedChapter = baseChapter.extend({
   actionPrompt: promptSchema,
   artifactTemplate: z.object({
     title: z.string().min(2),
-    fields: z.array(artifactFieldSchema).min(4),
+    fields: z.tuple([
+      artifactFieldSchema,
+      artifactFieldSchema,
+      artifactFieldSchema,
+      artifactFieldSchema,
+    ]),
   }),
-  reviewPrompts: z.array(promptSchema).min(3),
+  reviewPrompts: z.tuple([promptSchema, promptSchema, promptSchema]),
 });
 
 export const chapterSchema = z.discriminatedUnion("status", [

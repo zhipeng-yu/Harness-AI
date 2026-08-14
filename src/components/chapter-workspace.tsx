@@ -139,6 +139,17 @@ export function ChapterWorkspace({
               <p>{item.body}</p>
             </div>
           ))}
+          <h3>关键概念</h3>
+          {chapter.concepts.map((concept) => (
+            <div key={concept.term}>
+              <h4>{concept.term}</h4>
+              <p>{concept.meaning}</p>
+            </div>
+          ))}
+          <h3>适用场景</h3>
+          <ul>{chapter.scenarios.map((scenario) => <li key={scenario}>{scenario}</li>)}</ul>
+          <h3>常见误区</h3>
+          <ul>{chapter.misconceptions.map((misconception) => <li key={misconception}>{misconception}</li>)}</ul>
         </section>
 
         <section>
@@ -158,6 +169,7 @@ export function ChapterWorkspace({
           <h2>行动设计</h2>
           <ActionPlanForm
             chapterId={chapter.id}
+            actionPrompt={chapter.actionPrompt}
             initialValue={savedActionPlan}
             onSaved={setSavedActionPlan}
           />
@@ -169,6 +181,7 @@ export function ChapterWorkspace({
             <ArtifactEditor
               chapterId={chapter.id}
               title={chapter.artifactTemplate.title}
+              fields={chapter.artifactTemplate.fields}
               onCreated={setCurrentArtifact}
             />
           ) : (
@@ -197,6 +210,7 @@ export function ChapterWorkspace({
               {currentArtifact.status === "review_ready" ? (
                 <ArtifactReviewForm
                   artifactId={currentArtifact.id}
+                  prompts={chapter.reviewPrompts}
                   onSaved={acceptArtifactState}
                 />
               ) : null}

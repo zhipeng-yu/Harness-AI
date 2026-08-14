@@ -8,6 +8,7 @@ import {
   renameSync,
   rmSync,
   writeFileSync,
+  copyFileSync,
   symlinkSync,
   linkSync,
   unlinkSync,
@@ -33,9 +34,11 @@ const projectRoot = resolve(process.cwd());
 const dataRoot = join(projectRoot, "data");
 const backupRoot = join(projectRoot, "backups");
 const runtimeRoot = join(projectRoot, ".runtime");
+const artifactsRoot = join(projectRoot, "artifacts");
 const cleanupPaths: string[] = [];
 const externalCleanupPaths: string[] = [];
 const databases: DatabaseSync[] = [];
+const freshProjectWorker = join(projectRoot, "tests", "integration", "fixtures", "fresh-project-worker.ts");
 
 function makeProjectTemp(root: string, prefix: string) {
   mkdirSync(root, { recursive: true });
@@ -55,9 +58,10 @@ function assertCleanupBoundary(path: string) {
   const inData = relative(dataRoot, absolute);
   const inBackups = relative(backupRoot, absolute);
   const inRuntime = relative(runtimeRoot, absolute);
+  const inArtifacts = relative(artifactsRoot, absolute);
   const isChild = (candidate: string) =>
     candidate !== "" && candidate !== ".." && !candidate.startsWith(`..${sep}`);
-  if (!isChild(inData) && !isChild(inBackups) && !isChild(inRuntime)) {
+  if (!isChild(inData) && !isChild(inBackups) && !isChild(inRuntime) && !isChild(inArtifacts)) {
     throw new Error(
       `Refusing test cleanup outside project data/backups/runtime: ${absolute}`,
     );
@@ -120,6 +124,53 @@ afterEach(() => {
 });
 
 describe("verified SQLite backups", () => {
+  it.each([
+    ["creates a missing backups root", "backup"],
+    ["creates a missing data root for restore", "restore"],
+  ])("%s in a fresh project", (_label, mode) => {
+    const root = makeProjectTemp(join(projectRoot, "artifacts"), "fresh-project-");
+    const migrations = join(root, "src", "lib", "db", "migrations");
+    mkdirSync(migrations, { recursive: true });
+    mkdirSync(join(root, "data"));
+    copyFileSync(
+      join(projectRoot, "src", "lib", "db", "migrations", "001_initial.sql"),
+      join(migrations, "001_initial.sql"),
+    );
+
+    const result = spawnSync(process.execPath, ["--import", "tsx", freshProjectWorker, root, mode], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      env: { ...process.env, NODE_OPTIONS: "--disable-warning=ExperimentalWarning" },
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(existsSync(result.stdout.trim())).toBe(true);
+  });
+
+  it("refuses a direct project backups junction in a fresh project", () => {
+    const temporary = makeProjectTemp(artifactsRoot, "fresh-project-junction-");
+    const root = join(temporary, "project");
+    const outside = join(temporary, "outside");
+    const migrations = join(root, "src", "lib", "db", "migrations");
+    mkdirSync(migrations, { recursive: true });
+    mkdirSync(join(root, "data"));
+    mkdirSync(outside);
+    copyFileSync(
+      join(projectRoot, "src", "lib", "db", "migrations", "001_initial.sql"),
+      join(migrations, "001_initial.sql"),
+    );
+    symlinkSync(outside, join(root, "backups"), process.platform === "win32" ? "junction" : "dir");
+
+    const result = spawnSync(process.execPath, ["--import", "tsx", freshProjectWorker, root, "backup"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      env: { ...process.env, NODE_OPTIONS: "--disable-warning=ExperimentalWarning" },
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toMatch(/non-reparse|junction|real/i);
+    expect(readdirSync(outside)).toEqual([]);
+  });
   it("refuses a backup directory junction that resolves outside project backups", async () => {
     const dataDir = makeProjectTemp(dataRoot, "task9-data-");
     const linkParent = makeProjectTemp(backupRoot, "task9-backups-");

@@ -10,38 +10,138 @@ function Get-Utf8Text {
   return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Base64))
 }
 
+function Assert-HarnessRuntimeDirectory {
+  param(
+    [Parameter(Mandatory = $true)][string]$ProjectRoot,
+    [Parameter(Mandatory = $true)][string]$RuntimeDir
+  )
+
+  if (-not (Test-Path -LiteralPath $RuntimeDir)) {
+    New-Item -ItemType Directory -Path $RuntimeDir -ErrorAction Stop | Out-Null
+  }
+  $runtimeItem = Get-Item -LiteralPath $RuntimeDir -Force -ErrorAction Stop
+  if (-not $runtimeItem.PSIsContainer -or ($runtimeItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw 'Runtime directory must be a direct non-reparse project directory.'
+  }
+  $resolvedRuntime = (Resolve-Path -LiteralPath $RuntimeDir -ErrorAction Stop).Path
+  $expectedRuntime = Join-Path $ProjectRoot '.runtime'
+  if (-not $resolvedRuntime.Equals($expectedRuntime, [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Runtime directory must resolve directly inside the project.'
+  }
+  return $resolvedRuntime
+}
+
+function Get-HarnessRecordIdentity {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+  if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw 'Runtime record must be a regular non-reparse file.'
+  }
+  return [pscustomobject]@{
+    Length = $item.Length
+    CreationTicks = $item.CreationTimeUtc.Ticks
+    LastWriteTicks = $item.LastWriteTimeUtc.Ticks
+    Content = [IO.File]::ReadAllText($item.FullName, [Text.Encoding]::UTF8)
+  }
+}
+
+function Test-HarnessRecordIdentity {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)]$Identity
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
+  try {
+    $current = Get-HarnessRecordIdentity -Path $Path
+    return $current.Length -eq $Identity.Length -and
+      $current.CreationTicks -eq $Identity.CreationTicks -and
+      $current.LastWriteTicks -eq $Identity.LastWriteTicks -and
+      $current.Content -ceq $Identity.Content
+  } catch {
+    return $false
+  }
+}
+
+function Remove-HarnessOwnedRecord {
+  param(
+    [Parameter(Mandatory = $true)][string]$ProjectRoot,
+    [Parameter(Mandatory = $true)][string]$RuntimeDir,
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)]$Identity
+  )
+
+  [void](Assert-HarnessRuntimeDirectory -ProjectRoot $ProjectRoot -RuntimeDir $RuntimeDir)
+  if (-not (Test-HarnessRecordIdentity -Path $Path -Identity $Identity)) {
+    throw 'Runtime record identity changed; refusing cleanup.'
+  }
+  Remove-Item -LiteralPath $Path -Force
+}
+
 function Write-HarnessServerRecord {
   param(
+    [Parameter(Mandatory = $true)][string]$ProjectRoot,
     [Parameter(Mandatory = $true)][string]$RuntimeDir,
     [Parameter(Mandatory = $true)][string]$ServerFile,
     [Parameter(Mandatory = $true)]$Process
   )
 
-  New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
+  [void](Assert-HarnessRuntimeDirectory -ProjectRoot $ProjectRoot -RuntimeDir $RuntimeDir)
+  if (Test-Path -LiteralPath $ServerFile) {
+    throw 'Runtime server record already exists.'
+  }
   $temporaryServerFile = Join-Path $RuntimeDir 'server.json.tmp'
   $serverJson = @{
     pid = $Process.Id
     startTime = $Process.StartTime.ToUniversalTime().ToString('O')
   } | ConvertTo-Json
-  [IO.File]::WriteAllText(
-    $temporaryServerFile,
-    $serverJson,
-    [Text.UTF8Encoding]::new($false)
-  )
-  Move-Item -LiteralPath $temporaryServerFile -Destination $ServerFile -Force
+  $temporaryIdentity = $null
+  try {
+    $stream = [IO.File]::Open(
+      $temporaryServerFile,
+      [IO.FileMode]::CreateNew,
+      [IO.FileAccess]::Write,
+      [IO.FileShare]::None
+    )
+    try {
+      $bytes = [Text.UTF8Encoding]::new($false).GetBytes($serverJson)
+      $stream.Write($bytes, 0, $bytes.Length)
+      $stream.Flush($true)
+    } finally {
+      $stream.Dispose()
+    }
+    $temporaryIdentity = Get-HarnessRecordIdentity -Path $temporaryServerFile
+    [void](Assert-HarnessRuntimeDirectory -ProjectRoot $ProjectRoot -RuntimeDir $RuntimeDir)
+    if (Test-Path -LiteralPath $ServerFile) {
+      throw 'Runtime server record appeared before rename.'
+    }
+    if (-not (Test-HarnessRecordIdentity -Path $temporaryServerFile -Identity $temporaryIdentity)) {
+      throw 'Runtime temporary record identity changed before rename.'
+    }
+    Move-Item -LiteralPath $temporaryServerFile -Destination $ServerFile
+    return Get-HarnessRecordIdentity -Path $ServerFile
+  } catch {
+    if ($null -ne $temporaryIdentity -and (Test-HarnessRecordIdentity -Path $temporaryServerFile -Identity $temporaryIdentity)) {
+      Remove-Item -LiteralPath $temporaryServerFile -Force
+    }
+    throw
+  }
 }
 
 function Stop-FailedHarnessStart {
   param(
     [Parameter(Mandatory = $true)]$Process,
+    [Parameter(Mandatory = $true)][string]$ProjectRoot,
     [Parameter(Mandatory = $true)][string]$RuntimeDir,
-    [Parameter(Mandatory = $true)][string]$ServerFile
+    [Parameter(Mandatory = $true)][string]$ServerFile,
+    $ServerIdentity
   )
 
   $Process.Refresh()
   if ($Process.HasExited) {
-    if (Test-Path -LiteralPath $ServerFile -PathType Leaf) {
-      Remove-Item -LiteralPath $ServerFile -Force
+    if ($null -ne $ServerIdentity) {
+      Remove-HarnessOwnedRecord -ProjectRoot $ProjectRoot -RuntimeDir $RuntimeDir -Path $ServerFile -Identity $ServerIdentity
     }
     return
   }
@@ -52,12 +152,14 @@ function Stop-FailedHarnessStart {
       throw 'Process did not exit after stop.'
     }
   } catch {
-    Write-HarnessServerRecord -RuntimeDir $RuntimeDir -ServerFile $ServerFile -Process $Process
+    if ($null -eq $ServerIdentity) {
+      $ServerIdentity = Write-HarnessServerRecord -ProjectRoot $ProjectRoot -RuntimeDir $RuntimeDir -ServerFile $ServerFile -Process $Process
+    }
     throw (Get-Utf8Text '5ZCv5Yqo5ZCO5riF55CG5aSx6LSl44CC6L+Q6KGM6K6w5b2V5bey5L+d55WZ77yM6K+36L+Q6KGMIFN0b3AtSGFybmVzcy5jbWTjgII=')
   }
 
-  if (Test-Path -LiteralPath $ServerFile -PathType Leaf) {
-    Remove-Item -LiteralPath $ServerFile -Force
+  if ($null -ne $ServerIdentity) {
+    Remove-HarnessOwnedRecord -ProjectRoot $ProjectRoot -RuntimeDir $RuntimeDir -Path $ServerFile -Identity $ServerIdentity
   }
 }
 
@@ -72,6 +174,7 @@ function Invoke-HarnessStart {
   $runtimeDir = Join-Path $projectRoot '.runtime'
   $serverFile = Join-Path $runtimeDir 'server.json'
   $launchedProcess = $null
+  $serverIdentity = $null
 
   $nodePath = (Get-Command node -ErrorAction Stop).Source
   $nodeMajor = [int]((& $nodePath -p "process.versions.node.split('.')[0]").Trim())
@@ -88,6 +191,7 @@ function Invoke-HarnessStart {
   if ($null -ne $portOccupied) {
     throw (Get-Utf8Text '5pys5py656uv5Y+jIDMwMDAg5bey6KKr5Y2g55So44CC')
   }
+  [void](Assert-HarnessRuntimeDirectory -ProjectRoot $projectRoot -RuntimeDir $runtimeDir)
   if (Test-Path -LiteralPath $serverFile) {
     throw (Get-Utf8Text '5qOA5rWL5Yiw5bey5pyJ6L+Q6KGM6K6w5b2V77yM6K+35YWI6L+Q6KGMIFN0b3AtSGFybmVzcy5jbWTjgII=')
   }
@@ -135,7 +239,7 @@ function Invoke-HarnessStart {
       throw (Get-Utf8Text '572R56uZ5pyq5Zyo6KeE5a6a5pe26Ze05YaF5bCx57uq44CC')
     }
 
-    Write-HarnessServerRecord -RuntimeDir $runtimeDir -ServerFile $serverFile -Process $launchedProcess
+    $serverIdentity = Write-HarnessServerRecord -ProjectRoot $projectRoot -RuntimeDir $runtimeDir -ServerFile $serverFile -Process $launchedProcess
     if (-not $SkipBrowser) {
       Start-Process 'http://127.0.0.1:3000'
     }
@@ -144,7 +248,7 @@ function Invoke-HarnessStart {
     $startError = $_
     if ($null -ne $launchedProcess) {
       try {
-        Stop-FailedHarnessStart -Process $launchedProcess -RuntimeDir $runtimeDir -ServerFile $serverFile
+        Stop-FailedHarnessStart -Process $launchedProcess -ProjectRoot $projectRoot -RuntimeDir $runtimeDir -ServerFile $serverFile -ServerIdentity $serverIdentity
       } catch {
         throw
       }

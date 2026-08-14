@@ -62,13 +62,13 @@ test("follows the recommended growth flow until no published chapter remains", a
   await page.getByRole("button", { name: "标记为可以复盘" }).click();
 
   await page
-    .getByLabel("实际发生了什么")
+    .getByLabel("我是否完成了计划中的行动？")
     .fill("完成率提高，但消息处理仍然打断下午工作");
   await page
-    .getByLabel("什么有效、什么没有")
+    .getByLabel("这次行动带来了什么反馈？")
     .fill("单任务有效，消息窗口过长");
   await page
-    .getByLabel("下一版本只改一件什么事")
+    .getByLabel("下一次我会如何调整行动？")
     .fill("每个消息窗口限制为 15 分钟");
   await page
     .getByRole("button", { name: "完成复盘并创建下一版本" })

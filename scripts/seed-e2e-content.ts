@@ -1,6 +1,7 @@
 import {
   existsSync,
   lstatSync,
+  mkdirSync,
   realpathSync,
   unlinkSync,
 } from "node:fs";
@@ -35,6 +36,7 @@ export function assertSafeE2eEnvironment(
   }
 
   const dataDirectory = join(projectDirectory, "data");
+  if (!existsSync(dataDirectory)) mkdirSync(dataDirectory);
   const dataDirectoryStat = lstatSync(dataDirectory);
   const dataRealPath = realpathSync.native(dataDirectory);
   if (

@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -213,6 +214,50 @@ afterEach(() => {
 });
 
 describe("safe local launcher", () => {
+  it("refuses a runtime junction without writing outside the project", () => {
+    const { root } = createFixture();
+    const outside = mkdtempSync(join(testTempRoot, "outside-"));
+    temporaryRoots.push(outside);
+    const junction = powerShellResult([
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `New-Item -ItemType Junction -Path '${escapePowerShell(join(root, ".runtime"))}' -Target '${escapePowerShell(outside)}' | Out-Null`,
+    ]);
+    expect(junction.status).toBe(0);
+
+    const result = runStart(root);
+    const escapedRecord = join(outside, "server.json");
+    if (existsSync(escapedRecord)) {
+      const record = JSON.parse(readFileSync(escapedRecord, "utf8")) as { pid: number };
+      if (processExists(record.pid)) {
+        powerShellResult([
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          `Stop-Process -Id ${record.pid} -Force -ErrorAction Stop`,
+        ]);
+      }
+    }
+
+    expect(result.status).not.toBe(0);
+    expect(readdirSync(outside)).toEqual([]);
+  });
+
+  it("does not overwrite a pre-existing runtime temporary record", () => {
+    const { root } = createFixture();
+    const runtime = join(root, ".runtime");
+    mkdirSync(runtime);
+    const temporaryRecord = join(runtime, "server.json.tmp");
+    writeFileSync(temporaryRecord, "foreign record", "utf8");
+
+    const result = runStart(root);
+
+    expect(result.status).not.toBe(0);
+    expect(readFileSync(temporaryRecord, "utf8")).toBe("foreign record");
+    expect(existsSync(join(runtime, "server.json"))).toBe(false);
+  }, 20_000);
+
   it("does not let an inherited HARNESS_LAUNCHER_TEST environment variable bypass production gates", () => {
     const { root, commandLog } = createFixture({ nodeModules: false });
     const result = runStart(root, {
@@ -342,6 +387,28 @@ describe("safe local launcher", () => {
     expect(`${result.stdout}\n${result.stderr}`).toContain("Stop-Harness");
   });
 
+  it("does not remove a same-metadata runtime record swapped in during failed-start cleanup", () => {
+    const { root } = createFixture();
+    const serverFile = join(root, ".runtime", "server.json");
+    const result = runDotSourcedDriver(
+      root,
+      [
+        "$script:fake = [pscustomobject]@{ Id = 8123; StartTime = [datetime]'2026-08-13T04:05:06Z'; HasExited = $false }",
+        "$script:fake | Add-Member ScriptMethod Refresh {}",
+        "$script:fake | Add-Member ScriptMethod WaitForExit { param($timeout) return $true }",
+        "function Get-Command { [pscustomobject]@{ Source = 'node.exe' } }",
+        "function Invoke-WebRequest { [pscustomobject]@{ StatusCode = 200 } }",
+        `function Stop-Process { $item = Get-Item -LiteralPath '${escapePowerShell(serverFile)}'; $created = $item.CreationTimeUtc; $written = $item.LastWriteTimeUtc; $length = $item.Length; Remove-Item -LiteralPath '${escapePowerShell(serverFile)}' -Force; [IO.File]::WriteAllText('${escapePowerShell(serverFile)}', ('x' * $length), [Text.UTF8Encoding]::new($false)); $foreign = Get-Item -LiteralPath '${escapePowerShell(serverFile)}'; $foreign.CreationTimeUtc = $created; $foreign.LastWriteTimeUtc = $written; $script:fake.HasExited = $true }`,
+        "function Start-Process { param($FilePath) if ($FilePath -like 'http*') { throw 'browser failed' }; $script:fake }",
+        `try { Invoke-HarnessStart -ProjectRoot '${escapePowerShell(root)}' -ReadinessTimeoutSeconds 1 } catch { Write-Error $_.Exception.Message; exit 1 }`,
+      ].join("\n"),
+    );
+
+    expect(result.status).not.toBe(0);
+    expect(existsSync(serverFile)).toBe(true);
+    expect(readFileSync(serverFile, "utf8")).toMatch(/^x+$/);
+  });
+
   it("contains no firewall mutation or wildcard bind", () => {
     const source = readFileSync(startSource, "utf8");
     expect(source).not.toMatch(/New-NetFirewallRule|0\.0\.0\.0/);
@@ -349,6 +416,19 @@ describe("safe local launcher", () => {
 });
 
 describe("identity-safe local stopper", () => {
+  it("removes a validated stale record when its PID clearly does not exist", () => {
+    const { root } = createFixture();
+    let deadPid = 999_999;
+    while (processExists(deadPid) && deadPid > 900_000) deadPid -= 1;
+    const serverFile = writeRuntime(root, deadPid, "2026-08-13T04:05:06Z");
+
+    const result = runScript(join(root, "scripts", "Stop-Harness.ps1"));
+
+    expect(result.status).toBe(0);
+    expect(existsSync(serverFile)).toBe(false);
+    expect(`${result.stdout}\n${result.stderr}`).toMatch(/已停止|陈旧记录已清理/);
+  });
+
   it("stops only a matching process object and removes state after confirmed exit", () => {
     const { root } = createFixture();
     const child = startOwnedSleeper();

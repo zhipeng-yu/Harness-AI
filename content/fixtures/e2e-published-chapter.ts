@@ -26,10 +26,10 @@ export const publishedChapterFixture: Extract<
   artifactTemplate: {
     title: "最小行动记录",
     fields: [
-      { id: "chapter-01-artifact-problem", label: "当前问题" },
-      { id: "chapter-01-artifact-action", label: "最小行动" },
-      { id: "chapter-01-artifact-time", label: "开始时间" },
-      { id: "chapter-01-artifact-result", label: "行动结果" },
+      { id: "chapter-01-artifact-problem", label: "要解决的现实问题" },
+      { id: "chapter-01-artifact-principles", label: "从课程采用的核心原则" },
+      { id: "chapter-01-artifact-rules", label: "运行规则" },
+      { id: "chapter-01-artifact-success", label: "可观察的成功标准" },
     ],
   },
   reviewPrompts: [

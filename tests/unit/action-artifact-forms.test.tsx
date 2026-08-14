@@ -30,6 +30,7 @@ describe("fixed action and Artifact forms", () => {
     const { container } = render(
       <ActionPlanForm
         chapterId="chapter-01"
+        actionPrompt={publishedChapterFixture.actionPrompt}
         initialValue={null}
         onSaved={onSaved}
       />,
@@ -81,6 +82,7 @@ describe("fixed action and Artifact forms", () => {
       <ArtifactEditor
         chapterId="chapter-01"
         title="Focus system"
+        fields={publishedChapterFixture.artifactTemplate.fields}
         onCreated={onCreated}
       />,
     );
@@ -127,21 +129,25 @@ describe("fixed action and Artifact forms", () => {
     );
     const onSaved = vi.fn();
     const { container } = render(
-      <ArtifactReviewForm artifactId="artifact-01" onSaved={onSaved} />,
+      <ArtifactReviewForm
+        artifactId="artifact-01"
+        prompts={publishedChapterFixture.reviewPrompts}
+        onSaved={onSaved}
+      />,
     );
 
     expect(screen.getAllByRole("textbox")).toHaveLength(3);
     expect(container.querySelector('input[type="file"], input[type="url"]')).toBeNull();
     fireEvent.change(
-      screen.getByRole("textbox", { name: "实际发生了什么" }),
+      screen.getByRole("textbox", { name: publishedChapterFixture.reviewPrompts[0].question }),
       { target: { value: "Actual" } },
     );
     fireEvent.change(
-      screen.getByRole("textbox", { name: "什么有效、什么没有" }),
+      screen.getByRole("textbox", { name: publishedChapterFixture.reviewPrompts[1].question }),
       { target: { value: "Effective" } },
     );
     fireEvent.change(
-      screen.getByRole("textbox", { name: "下一版本只改一件什么事" }),
+      screen.getByRole("textbox", { name: publishedChapterFixture.reviewPrompts[2].question }),
       { target: { value: "Next change" } },
     );
     fireEvent.click(
@@ -160,6 +166,23 @@ describe("fixed action and Artifact forms", () => {
         createNextVersion: true,
       }),
     });
+  });
+
+  it("uses stable review prompt ids and questions in fixed storage order", () => {
+    render(
+      <ArtifactReviewForm
+        artifactId="artifact-01"
+        prompts={publishedChapterFixture.reviewPrompts}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    for (const prompt of publishedChapterFixture.reviewPrompts) {
+      expect(screen.getByRole("textbox", { name: prompt.question })).toHaveAttribute(
+        "id",
+        prompt.id,
+      );
+    }
   });
 
   it("uses the lifecycle state returned by the server", async () => {
@@ -189,7 +212,7 @@ describe("fixed action and Artifact forms", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByRole("textbox", { name: "实际发生了什么" }),
+        screen.getByRole("textbox", { name: publishedChapterFixture.reviewPrompts[0].question }),
       ).toBeInTheDocument(),
     );
   });

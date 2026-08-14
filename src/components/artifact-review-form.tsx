@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import type { ChapterDefinition } from "@/content/schema";
 import type { ArtifactStatus } from "@/src/types/learning";
+
+type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
 
 export type ArtifactState = { status: ArtifactStatus; version: number };
 
 type ArtifactReviewFormProps = Readonly<{
   artifactId: string;
+  prompts: PublishedChapter["reviewPrompts"];
   onSaved: (state: ArtifactState) => void;
 }>;
 
@@ -23,7 +27,7 @@ export function isArtifactState(value: unknown): value is ArtifactState {
   );
 }
 
-export function ArtifactReviewForm({ artifactId, onSaved }: ArtifactReviewFormProps) {
+export function ArtifactReviewForm({ artifactId, prompts, onSaved }: ArtifactReviewFormProps) {
   const [actualResult, setActualResult] = useState("");
   const [effective, setEffective] = useState("");
   const [nextChange, setNextChange] = useState("");
@@ -53,12 +57,12 @@ export function ArtifactReviewForm({ artifactId, onSaved }: ArtifactReviewFormPr
 
   return (
     <form onSubmit={(event) => event.preventDefault()}>
-      <label htmlFor="artifact-review-actual">实际发生了什么</label>
-      <textarea id="artifact-review-actual" required value={actualResult} onChange={(event) => setActualResult(event.target.value)} />
-      <label htmlFor="artifact-review-effective">什么有效、什么没有</label>
-      <textarea id="artifact-review-effective" required value={effective} onChange={(event) => setEffective(event.target.value)} />
-      <label htmlFor="artifact-review-next">下一版本只改一件什么事</label>
-      <textarea id="artifact-review-next" required value={nextChange} onChange={(event) => setNextChange(event.target.value)} />
+      <label htmlFor={prompts[0].id}>{prompts[0].question}</label>
+      <textarea id={prompts[0].id} required value={actualResult} onChange={(event) => setActualResult(event.target.value)} />
+      <label htmlFor={prompts[1].id}>{prompts[1].question}</label>
+      <textarea id={prompts[1].id} required value={effective} onChange={(event) => setEffective(event.target.value)} />
+      <label htmlFor={prompts[2].id}>{prompts[2].question}</label>
+      <textarea id={prompts[2].id} required value={nextChange} onChange={(event) => setNextChange(event.target.value)} />
       <button type="button" disabled={saving || !complete} onClick={() => void save(false)}>完成复盘</button>
       <button type="button" disabled={saving || !complete} onClick={() => void save(true)}>完成复盘并创建下一版本</button>
       {saveError ? <p role="alert">复盘保存失败，请重试。</p> : null}

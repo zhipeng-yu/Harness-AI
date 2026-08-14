@@ -87,7 +87,7 @@ npm.cmd run test:e2e
 
 Task11 的 RED/GREEN、1440×900 截图检查、console/page error、溢出/阅读列/sticky/focus/save-error 结果和最终矩阵记录在 `.superpowers/sdd/2026-08-13-personal-harness-learning-system/task-11-report.md`。
 
-2026-08-14 的最新证据：内容校验为 18 章有效、0 章 published；Vitest 17 个文件、170 个测试通过；lint 与生产构建通过；串行 Playwright 5/5 通过且无警告；临时恢复门禁的 9 张表集合与逐表计数一致，临时目标已清理。实际启动器 gate 中首页返回 HTTP 200；正式停止器 exit 0 后运行记录、监听端口和已记录 PID 均消失。视觉截图保存在 `artifacts/visual-check/`。
+2026-08-14 的最新证据：内容校验为 18 章有效、0 章 published；Vitest 18 个文件、185 个测试通过；lint 与生产构建通过；串行 Playwright 5/5 通过且无警告；fresh project 会安全创建缺失的 `data/`、`backups/`，并拒绝 direct junction；启动器会拒绝 `.runtime` junction/预占临时记录，停止器会安全清理明确不存在 PID 的陈旧记录。临时恢复门禁的 9 张表集合与逐表计数一致，临时目标已清理。实际启动器 gate 中首页返回 HTTP 200；正式停止器 exit 0 后运行记录、监听端口和已记录 PID 均消失。视觉截图保存在 `artifacts/visual-check/`。
 
 ## 已知限制
 

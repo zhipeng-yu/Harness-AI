@@ -1,6 +1,7 @@
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -60,6 +61,21 @@ test("rejects a project data directory that is a junction or reparse point", () 
     ).toThrow("data directory");
   } finally {
     unlinkSync(dataDirectory);
+    rmSync(temporary, { recursive: true, force: true });
+  }
+});
+
+test("creates a missing direct project data directory", () => {
+  const temporary = createProjectLocalTempDirectory();
+  const projectDirectory = join(temporary, "project");
+  const configFile = join(projectDirectory, "playwright.config.ts");
+  mkdirSync(projectDirectory);
+  writeFileSync(configFile, "export default {};\n", "utf8");
+
+  try {
+    const environment = assertSafeE2eEnvironment(configFile, projectDirectory);
+    expect(environment.dataDirectory).toBe(realpathSync.native(join(projectDirectory, "data")));
+  } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
 });

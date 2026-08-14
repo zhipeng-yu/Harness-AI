@@ -22,6 +22,28 @@ describe("chapter content contract", () => {
     expect(chapterSchema.parse(publishedChapterFixture).status).toBe("published");
   });
 
+  it.each([
+    ["review prompts", "reviewPrompts", 4],
+    ["Artifact fields", "artifactTemplate.fields", 5],
+  ])("rejects published chapters with extra %s", (_label, path, expectedLength) => {
+    const invalid = structuredClone(publishedChapterFixture);
+    if (path === "reviewPrompts") {
+      invalid.reviewPrompts.push({
+        id: "chapter-01-review-04",
+        question: "这条额外复盘提示不应被固定表单静默忽略。",
+      });
+    } else {
+      invalid.artifactTemplate.fields.push({
+        id: "chapter-01-artifact-extra",
+        label: "额外字段",
+      });
+    }
+
+    expect(path === "reviewPrompts" ? invalid.reviewPrompts : invalid.artifactTemplate.fields)
+      .toHaveLength(expectedLength);
+    expect(() => chapterSchema.parse(invalid)).toThrow();
+  });
+
   it("rejects display text used as a prompt id", () => {
     const invalid = structuredClone(publishedChapterFixture);
     invalid.reflectionPrompts[0].id = "我现在遇到什么问题？";

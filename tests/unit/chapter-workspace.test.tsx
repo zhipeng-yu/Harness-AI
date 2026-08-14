@@ -24,15 +24,53 @@ describe("ChapterWorkspace", () => {
     render(
       <ChapterWorkspace
         chapter={publishedChapterFixture}
-        learningStage="not_started"
+        learningStage="understanding"
         savedResponses={{}}
         actionPlan={null}
         artifact={null}
       />,
     );
 
-    expect(screen.getAllByRole("listitem")).toHaveLength(6);
+    expect(screen.getByRole("navigation", { name: "章节学习阶段" }).querySelectorAll("li"))
+      .toHaveLength(6);
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
+  });
+
+  it("renders every explanatory contract block from the published chapter", () => {
+    render(
+      <ChapterWorkspace
+        chapter={publishedChapterFixture}
+        learningStage="understanding"
+        savedResponses={{}}
+        actionPlan={null}
+        artifact={null}
+      />,
+    );
+
+    expect(screen.getByText(publishedChapterFixture.concepts[0].term)).toBeInTheDocument();
+    expect(screen.getByText(publishedChapterFixture.concepts[0].meaning)).toBeInTheDocument();
+    expect(screen.getByText(publishedChapterFixture.scenarios[0])).toBeInTheDocument();
+    expect(screen.getByText(publishedChapterFixture.misconceptions[0])).toBeInTheDocument();
+  });
+
+  it("binds stable course prompt and field ids to the fixed forms", () => {
+    render(
+      <ChapterWorkspace
+        chapter={publishedChapterFixture}
+        learningStage="understanding"
+        savedResponses={{}}
+        actionPlan={null}
+        artifact={null}
+      />,
+    );
+
+    expect(screen.getByText(publishedChapterFixture.actionPrompt.question)).toHaveAttribute(
+      "id",
+      publishedChapterFixture.actionPrompt.id,
+    );
+    for (const field of publishedChapterFixture.artifactTemplate.fields) {
+      expect(document.getElementById(field.id)).toHaveAccessibleName(field.label);
+    }
   });
 
   it("renders saved reflection responses as editable autosave fields", () => {

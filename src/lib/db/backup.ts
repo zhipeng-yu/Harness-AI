@@ -24,6 +24,7 @@ import { backupRuntimeOps } from "@/src/lib/db/backup-runtime-ops";
 import {
   BACKUP_DIRECTORY,
   DATA_DIRECTORY,
+  ensureDirectProjectDirectory,
   SERVER_STATE_PATH,
 } from "@/src/lib/paths";
 
@@ -373,6 +374,8 @@ export async function createVerifiedBackup(
   backupDir: string,
   kind: BackupKind = "manual",
 ): Promise<BackupResult> {
+  ensureDirectProjectDirectory("data");
+  ensureDirectProjectDirectory("backups");
   const sourcePath = requireExistingRealFile(
     DATA_DIRECTORY,
     dbPath,
@@ -546,6 +549,8 @@ export async function restoreBackup(options: {
   confirm: true;
 }): Promise<void> {
   if (options.confirm !== true) throw new Error("Restore confirmation is required");
+  ensureDirectProjectDirectory("backups");
+  ensureDirectProjectDirectory("data");
   if (resolve(options.source) === resolve(options.target)) {
     throw new Error("Backup source and restore target are the same path");
   }

@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import type { ChapterDefinition } from "@/content/schema";
 import type { ActionPlan } from "@/src/features/actions/repository";
+
+type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
 
 type ActionPlanFormProps = Readonly<{
   chapterId: string;
+  actionPrompt: PublishedChapter["actionPrompt"];
   initialValue: ActionPlan | null;
   onSaved: (saved: ActionPlan) => void;
 }>;
@@ -26,6 +30,7 @@ function isActionPlan(value: unknown): value is ActionPlan {
 
 export function ActionPlanForm({
   chapterId,
+  actionPrompt,
   initialValue,
   onSaved,
 }: ActionPlanFormProps) {
@@ -66,7 +71,8 @@ export function ActionPlanForm({
       <label htmlFor="action-plan-problem">现实问题</label>
       <textarea id="action-plan-problem" required value={problem} onChange={(event) => setProblem(event.target.value)} />
       <label htmlFor="action-plan-action">行动</label>
-      <textarea id="action-plan-action" required value={action} onChange={(event) => setAction(event.target.value)} />
+      <p id={actionPrompt.id}>{actionPrompt.question}</p>
+      <textarea id="action-plan-action" aria-describedby={actionPrompt.id} required value={action} onChange={(event) => setAction(event.target.value)} />
       <label htmlFor="action-plan-success">可观察的成功标准</label>
       <textarea id="action-plan-success" required value={successCriteria} onChange={(event) => setSuccessCriteria(event.target.value)} />
       <button type="submit" disabled={saving}>{saving ? "保存中…" : "保存行动计划"}</button>
