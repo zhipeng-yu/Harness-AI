@@ -242,7 +242,7 @@ describe("safe local launcher", () => {
 
     expect(result.status).not.toBe(0);
     expect(readdirSync(outside)).toEqual([]);
-  });
+  }, 15_000);
 
   it("does not overwrite a pre-existing runtime temporary record", () => {
     const { root } = createFixture();

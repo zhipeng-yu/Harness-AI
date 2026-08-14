@@ -37,3 +37,9 @@
 - `$env:PLAYWRIGHT_BROWSERS_PATH='0'; npm.cmd run test:e2e` → 5/5 passed，24.2s。
 - `git diff --check` → exit 0。
 - E2E/launcher 串行运行；最终检查确认 `.runtime`、launcher/fresh/seed/task 测试临时目录与 3000 LISTEN 均无残留。正式 `data/harness.sqlite` 仍为 90112 bytes、时间戳 2026-08-14 09:38:13；两份既有备份的大小与时间戳仍与 Task11 记录一致。
+
+## Controller verification follow-up
+
+- Controller 全量验证中，真实 PowerShell 的 Start runtime-junction 用例在 5844ms 被 Vitest 默认 5000ms timeout 中止；没有 assertion failure。
+- 未修改 timeout 前连续三次单独运行均通过：测试体分别为 3.45s、3.39s、3.65s，总命令分别为 5.73s、5.67s、6.00s。每次后 3000 无 LISTEN，`.runtime` 与 `.tools/launcher-tests` 均无残留。
+- 根因是该用例串行启动两个真实 PowerShell 进程（创建 junction、执行 Start），在控制器负载下超过默认 5 秒，不是子进程或清理泄漏。只给该用例设置 15 秒 timeout，与同文件其他真实 CLI 测试的 per-test timeout 做法一致；未改全局 timeout。
