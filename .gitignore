@@ -8,6 +8,10 @@ data/*.sqlite*
 backups/
 .runtime/
 .npm-cache/
+tsconfig.tsbuildinfo
+node_modules/playwright-core/.local-browsers/
 playwright-report/
 test-results/
+blob-report/
+artifacts/visual-check/
 coverage/

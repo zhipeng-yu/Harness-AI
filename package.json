@@ -6,7 +6,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "node --disable-warning=ExperimentalWarning node_modules/@playwright/test/cli.js test",
     "content:validate": "tsx scripts/validate-content.ts",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:backup": "tsx scripts/db-backup.ts",
