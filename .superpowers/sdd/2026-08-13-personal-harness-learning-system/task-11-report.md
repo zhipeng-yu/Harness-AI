@@ -63,3 +63,22 @@
 - Playwright 浏览器文件与截图均为项目本地、被 Git 忽略的运行证据，不应提交。
 - 实际 Windows 启动/停止 gate 已由 controller 完成；停止后 `.runtime/server.json` 不存在、3000 端口无监听、已记录 PID 不存在。
 - 唯一内容优先项仍是取得完整第一章音频，按审批、备份、发布、完整验证门禁处理；不应扩大产品范围。
+
+## Review fix round 1（2026-08-14）
+
+本轮只收紧测试安全边界与验收断言，没有改变产品功能。
+
+1. Seed 根路径边界：新增 foreign cwd 与 junction/reparse 两个单元测试，初次均因缺少独立 guard 而 RED。GREEN 后 seed 从 Playwright `FullConfig.configFile` 的 realpath 推导项目根，独立比较 `process.cwd()`；字面 `root/data` 必须是普通目录且 realpath 不变。seed 不再使用从同一 cwd 派生的 `PROJECT_DIRECTORY` / `DATA_DIRECTORY` 作为信任根。focused Vitest 2/2 通过。
+2. Growth 推荐语义：旧末尾只检查“下一步”heading，无法证明推荐内容。自检 RED 在完整流程结束处要求“制定行动”并失败；GREEN 将“制定行动 + 测试用已发布章节”放到完成学习后的中间状态，最终精确断言“暂无可推荐的已发布章节。”且“制定行动”不存在。focused E2E 1/1 通过（14.2s）。
+3. 无源媒体边界：把相同负向断言放在 404 路径时，新增 response 200 断言按预期 RED（received 404）。恢复正确章节后同时验证 HTTP 200、章节 h1、无 `audio/video`、无逐字稿/下载音频 UI；focused E2E 1/1 通过（1.8s）。
+4. Sticky 可见性：临时测试注入保持 `y < 900` 但令底边为 1224.53px，新 bottom 断言按预期 RED。移除注入后，真实摘要 bounding box 非空、宽高均大于 0、顶部位于视口内且底边不超过 900px；focused E2E 1/1 通过（2.6s）。
+
+Round 1 最终矩阵：
+
+- `npm.cmd run content:validate`：PASS，18 chapters，0 published。
+- `npm.cmd test`：PASS，18/18 files，172/172 tests，91.49s。
+- `npm.cmd run lint`：PASS，exit 0。
+- `npm.cmd run build`：PASS，编译、TypeScript 与 7/7 静态页面生成完成。
+- `$env:PLAYWRIGHT_BROWSERS_PATH='0'; npm.cmd run test:e2e`：controller escalated PASS，5/5，27.2s，exit 0。
+
+第一次全量 Vitest 与 controller E2E 并发时，launcher fixture 因同时使用 3000 端口产生失败；独立重跑 launcher 行为后仅遇到既有 Windows fixture 清理竞态，清理该项目内残留 fixture 并串行重跑后 172/172 全绿。本轮未修改 launcher。正式 `data/harness.sqlite` 与已有备份未被本轮测试修改或删除。

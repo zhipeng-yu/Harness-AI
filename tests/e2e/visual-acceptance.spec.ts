@@ -87,6 +87,9 @@ test("keeps the chapter reading column and sticky summary usable", async ({
   expect(summaryBox).not.toBeNull();
   expect(summaryBox?.y).toBeGreaterThanOrEqual(0);
   expect(summaryBox?.y).toBeLessThan(900);
+  expect(summaryBox?.width).toBeGreaterThan(0);
+  expect(summaryBox?.height).toBeGreaterThan(0);
+  expect((summaryBox?.y ?? 0) + (summaryBox?.height ?? 0)).toBeLessThanOrEqual(900);
 });
 
 test("shows keyboard focus and a legible autosave error", async ({ page }) => {

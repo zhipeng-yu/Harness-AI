@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("turns one chapter into a reviewed Artifact and recommends the next step", async ({
+test("follows the recommended growth flow until no published chapter remains", async ({
   page,
 }) => {
   await page.goto("/");
@@ -17,6 +17,16 @@ test("turns one chapter into a reviewed Artifact and recommends the next step", 
   await expect(
     page.getByRole("button", { name: "已完成本章学习" }),
   ).toBeVisible();
+
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  const recommendation = page.locator(".next-action");
+  await expect(recommendation).toContainText("制定行动");
+  await expect(
+    recommendation.getByRole("heading", { name: "测试用已发布章节" }),
+  ).toBeVisible();
+  await recommendation.getByRole("link", { name: "打开章节工作台" }).click();
+  await page.waitForLoadState("networkidle");
 
   await page
     .getByLabel("现实问题", { exact: true })
@@ -67,5 +77,8 @@ test("turns one chapter into a reviewed Artifact and recommends the next step", 
 
   await page.goto("/");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "下一步" })).toBeVisible();
+  await expect(
+    page.getByText("暂无可推荐的已发布章节。", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("制定行动", { exact: true })).toHaveCount(0);
 });

@@ -4,21 +4,56 @@ import {
   realpathSync,
   unlinkSync,
 } from "node:fs";
-import { basename, dirname, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
+import type { FullConfig } from "@playwright/test";
 import { openDatabase } from "@/src/lib/db/connection";
 import { migrate } from "@/src/lib/db/migrate";
-import { DATA_DIRECTORY, PROJECT_DIRECTORY } from "@/src/lib/paths";
 
 const E2E_DATABASE_NAME = "e2e.sqlite";
-const E2E_DATABASE_PATH = resolve(DATA_DIRECTORY, E2E_DATABASE_NAME);
-const E2E_FILES = [
-  E2E_DATABASE_PATH,
-  `${E2E_DATABASE_PATH}-wal`,
-  `${E2E_DATABASE_PATH}-shm`,
-] as const;
 
-function assertInsideDataDirectory(path: string): void {
-  const dataRealPath = realpathSync.native(DATA_DIRECTORY);
+function samePath(left: string, right: string): boolean {
+  return process.platform === "win32"
+    ? resolve(left).toLowerCase() === resolve(right).toLowerCase()
+    : resolve(left) === resolve(right);
+}
+
+export function assertSafeE2eEnvironment(
+  configFile: string | undefined,
+  workingDirectory: string,
+): {
+  dataDirectory: string;
+  databasePath: string;
+  files: readonly string[];
+} {
+  if (!configFile) throw new Error("Playwright config file is required.");
+
+  const configRealPath = realpathSync.native(configFile);
+  const projectDirectory = realpathSync.native(dirname(configRealPath));
+  const workingDirectoryRealPath = realpathSync.native(workingDirectory);
+  if (!samePath(workingDirectoryRealPath, projectDirectory)) {
+    throw new Error("Run the E2E seed from the Playwright project root.");
+  }
+
+  const dataDirectory = join(projectDirectory, "data");
+  const dataDirectoryStat = lstatSync(dataDirectory);
+  const dataRealPath = realpathSync.native(dataDirectory);
+  if (
+    !dataDirectoryStat.isDirectory() ||
+    dataDirectoryStat.isSymbolicLink() ||
+    !samePath(dataRealPath, dataDirectory)
+  ) {
+    throw new Error("Project data directory must be the real root/data directory.");
+  }
+
+  const databasePath = join(dataRealPath, E2E_DATABASE_NAME);
+  return {
+    dataDirectory: dataRealPath,
+    databasePath,
+    files: [databasePath, `${databasePath}-wal`, `${databasePath}-shm`],
+  };
+}
+
+function assertInsideDataDirectory(path: string, dataRealPath: string): void {
   const parentRealPath = realpathSync.native(dirname(path));
   const relativeParent = relative(dataRealPath, parentRealPath);
   const allowedNames = new Set([
@@ -30,7 +65,7 @@ function assertInsideDataDirectory(path: string): void {
   if (
     relativeParent !== "" ||
     !allowedNames.has(basename(path)) ||
-    resolve(path) !== resolve(parentRealPath, basename(path))
+    !samePath(path, resolve(parentRealPath, basename(path)))
   ) {
     throw new Error(`Refusing to remove E2E database path outside project data: ${path}`);
   }
@@ -41,23 +76,27 @@ function assertInsideDataDirectory(path: string): void {
     }
     const fileRealPath = realpathSync.native(path);
     const relativeFile = relative(dataRealPath, fileRealPath);
-    if (relativeFile.startsWith("..") || resolve(dataRealPath, relativeFile) !== fileRealPath) {
+    if (
+      relativeFile.startsWith("..") ||
+      !samePath(resolve(dataRealPath, relativeFile), fileRealPath)
+    ) {
       throw new Error(`Refusing to remove E2E database path outside project data: ${path}`);
     }
   }
 }
 
-export default function seedE2eContent(): void {
-  if (resolve(process.cwd()) !== resolve(PROJECT_DIRECTORY)) {
-    throw new Error("Run the E2E seed from the project root.");
-  }
+export default function seedE2eContent(config: FullConfig): void {
+  const environment = assertSafeE2eEnvironment(
+    config.configFile,
+    process.cwd(),
+  );
 
-  for (const path of E2E_FILES) {
-    assertInsideDataDirectory(path);
+  for (const path of environment.files) {
+    assertInsideDataDirectory(path, environment.dataDirectory);
     if (existsSync(path)) unlinkSync(path);
   }
 
-  const db = openDatabase(E2E_DATABASE_PATH);
+  const db = openDatabase(environment.databasePath);
   try {
     migrate(db);
   } finally {
