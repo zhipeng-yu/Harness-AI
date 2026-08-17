@@ -1,5 +1,6 @@
 import { chapterSchema } from "@/content/schema";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
+import { chapter01 } from "@/content/chapters/chapter-01";
 
 async function loadRegistry(environment: Record<string, string | undefined> = {}) {
   vi.resetModules();
@@ -75,12 +76,13 @@ describe("chapter content contract", () => {
     ).toThrow();
   });
 
-  it("exposes exactly 18 unique awaiting-audio chapters by default", async () => {
+  it("exposes one published chapter and 17 awaiting-audio chapters by default", async () => {
     const { getChapters } = await loadRegistry();
     const chapters = getChapters();
 
     expect(chapters).toHaveLength(18);
-    expect(chapters.every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
+    expect(chapters[0]).toEqual(chapter01);
+    expect(chapters.slice(1).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
     expect(new Set(chapters.map((chapter) => chapter.id)).size).toBe(18);
     expect(new Set(chapters.map((chapter) => chapter.slug)).size).toBe(18);
     expect(chapters.map((chapter) => chapter.order)).toEqual([
@@ -98,7 +100,7 @@ describe("chapter content contract", () => {
 
   it("uses the published fixture only when both test environment variables are set", async () => {
     const production = await loadRegistry({ HARNESS_TEST: "1" });
-    expect(production.getChapters()[0].status).toBe("awaiting_audio");
+    expect(production.getChapters()[0]).toEqual(chapter01);
 
     const testRegistry = await loadRegistry({
       HARNESS_TEST: "1",

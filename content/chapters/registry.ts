@@ -1,8 +1,9 @@
 import { publishedChapterFixture } from "../fixtures/published-chapter";
 import { chapterSchema, type ChapterDefinition } from "../schema";
+import { chapter01 } from "./chapter-01";
 
-const awaitingChapters: readonly ChapterDefinition[] = [
-  { id: "chapter-01", slug: "chapter-01", order: 1, title: "第1章（等待音频）", status: "awaiting_audio" },
+const chapterCatalog: readonly ChapterDefinition[] = [
+  chapter01,
   { id: "chapter-02", slug: "chapter-02", order: 2, title: "第2章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-03", slug: "chapter-03", order: 3, title: "第3章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-04", slug: "chapter-04", order: 4, title: "第4章（等待音频）", status: "awaiting_audio" },
@@ -22,7 +23,7 @@ const awaitingChapters: readonly ChapterDefinition[] = [
   { id: "chapter-18", slug: "chapter-18", order: 18, title: "第18章（等待音频）", status: "awaiting_audio" },
 ];
 
-const productionChapters = awaitingChapters.map((chapter) => chapterSchema.parse(chapter));
+const productionChapters = chapterCatalog.map((chapter) => chapterSchema.parse(chapter));
 const testPublishedChapter = chapterSchema.parse(publishedChapterFixture);
 
 export function assertChapterRegistry(chapters: readonly ChapterDefinition[]): void {
