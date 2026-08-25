@@ -8,6 +8,7 @@ import { ActionPlanForm } from "./action-plan-form";
 import { ArtifactEditor } from "./artifact-editor";
 import { ArtifactReviewForm, isArtifactState } from "./artifact-review-form";
 import { AutosaveField } from "./autosave-field";
+import { ChapterDeck } from "./chapter-deck";
 import { ProgressStepper } from "./progress-stepper";
 
 type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
@@ -42,6 +43,7 @@ export function ChapterWorkspace({
   const [artifactSaving, setArtifactSaving] = useState(false);
   const [artifactError, setArtifactError] = useState(false);
   const opened = useRef(false);
+  const practiceStart = useRef<HTMLElement>(null);
 
   const saveProgress = useCallback(async (nextStage: "understanding" | "learned") => {
     setSaving(true);
@@ -110,48 +112,27 @@ export function ChapterWorkspace({
     [],
   );
 
+  const enterPractice = useCallback(() => {
+    practiceStart.current?.focus({ preventScroll: true });
+    practiceStart.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   return (
     <main className="chapter-workspace">
+      <div className="chapter-workspace__learning">
+        <ChapterDeck chapter={chapter} onEnterPractice={enterPractice} />
+      </div>
+
       <aside className="chapter-workspace__stages">
         <ProgressStepper learningStage={learningStage} />
       </aside>
 
-      <article className="chapter-workspace__content">
-        <p className="chapter-workspace__eyebrow">第 {chapter.order} 章</p>
-        <h1>{chapter.title}</h1>
-        <section>
-          <h2>本章要解决的问题</h2>
-          <p>{chapter.problem}</p>
-          <p>{chapter.oneSentence}</p>
-        </section>
-
-        <section>
-          <h2>理解系统</h2>
-          {chapter.coreStructure.map((item) => (
-            <div key={item.title}>
-              <h3>{item.title}</h3>
-              <p>{item.body}</p>
-            </div>
-          ))}
-          {chapter.explanation.map((item) => (
-            <div key={item.heading}>
-              <h3>{item.heading}</h3>
-              <p>{item.body}</p>
-            </div>
-          ))}
-          <h3>关键概念</h3>
-          {chapter.concepts.map((concept) => (
-            <div key={concept.term}>
-              <h4>{concept.term}</h4>
-              <p>{concept.meaning}</p>
-            </div>
-          ))}
-          <h3>适用场景</h3>
-          <ul>{chapter.scenarios.map((scenario) => <li key={scenario}>{scenario}</li>)}</ul>
-          <h3>常见误区</h3>
-          <ul>{chapter.misconceptions.map((misconception) => <li key={misconception}>{misconception}</li>)}</ul>
-        </section>
-
+      <article
+        ref={practiceStart}
+        className="chapter-workspace__content"
+        tabIndex={-1}
+        aria-label="章节实践工作区"
+      >
         <section>
           <h2>照见自己</h2>
           {chapter.reflectionPrompts.map((prompt) => (

@@ -1,6 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { chapter01 } from "@/content/chapters/chapter-01";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
+import { buildChapterSlides } from "@/src/components/chapter-deck";
 import { ChapterWorkspace } from "@/src/components/chapter-workspace";
 
 const progressResponse = {
@@ -36,7 +38,11 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
-  it("renders every explanatory contract block from the published chapter", () => {
+  it("turns the full first chapter into an 18-slide deck", () => {
+    expect(buildChapterSlides(chapter01)).toHaveLength(18);
+  });
+
+  it("supports keyboard paging", () => {
     render(
       <ChapterWorkspace
         chapter={publishedChapterFixture}
@@ -47,9 +53,35 @@ describe("ChapterWorkspace", () => {
       />,
     );
 
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+
+    expect(screen.getByText(publishedChapterFixture.coreStructure[0].title)).toBeInTheDocument();
+    expect(screen.getByText("2 / 8")).toBeInTheDocument();
+  });
+
+  it("keeps complete explanatory content available while paging", () => {
+    render(
+      <ChapterWorkspace
+        chapter={publishedChapterFixture}
+        learningStage="understanding"
+        savedResponses={{}}
+        actionPlan={null}
+        artifact={null}
+      />,
+    );
+
+    const next = screen.getByRole("button", { name: /下一页/ });
+    for (let index = 0; index < 4; index += 1) fireEvent.click(next);
+
     expect(screen.getByText(publishedChapterFixture.concepts[0].term)).toBeInTheDocument();
-    expect(screen.getByText(publishedChapterFixture.concepts[0].meaning)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "展开完整讲义" }));
+    const notes = screen.getByRole("complementary", { name: /完整讲义/ });
+    expect(within(notes).getByText(publishedChapterFixture.concepts[0].meaning)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "返回幻灯片" }));
+    fireEvent.click(next);
     expect(screen.getByText(publishedChapterFixture.scenarios[0])).toBeInTheDocument();
+    fireEvent.click(next);
     expect(screen.getByText(publishedChapterFixture.misconceptions[0])).toBeInTheDocument();
   });
 

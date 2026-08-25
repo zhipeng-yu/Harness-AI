@@ -6,6 +6,8 @@
 
 当前已有 18 章目录，第一章《获取超体的脑机接口：获得 10 倍输出能力》已发布，其余 17 章等待完整音频。
 
+已发布章节的知识讲解会按现有语义结构自动整理成桌面 16:9 幻灯片；第一章共 18 页，包含本地插画、方向键翻页和舞台内完整讲义。最后一页进入原有反思、行动与 Artifact 工作区。当前不做手机专项适配。
+
 ## 安装与使用
 
 需要 Windows、PowerShell 和 Node.js 24+。所有依赖只安装在项目内：
@@ -29,6 +31,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Stop-Harness.ps1
 - 私人数据：`data/harness.sqlite`
 - 备份：`backups/*.sqlite`
 - 课程内容：`content/`
+- 课程插画：`public/illustrations/`
 - 临时运行记录：`.runtime/server.json`
 
 发布课程或修改数据库结构前，先停止网站并备份：
