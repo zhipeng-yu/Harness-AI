@@ -332,8 +332,7 @@ main {
   justify-content: center;
 }
 
-.chapter-deck__eyebrow,
-.chapter-deck__notes-heading > p {
+.chapter-deck__eyebrow {
   margin-bottom: 0.7rem;
   color: var(--action);
   font-size: 0.72rem;
@@ -403,56 +402,6 @@ main {
 
 .chapter-deck__visual img {
   object-fit: contain;
-}
-
-.chapter-deck__notes-button {
-  position: absolute;
-  right: 1.5rem;
-  bottom: 1.35rem;
-  z-index: 1;
-  margin: 0;
-  color: var(--forest-900);
-  background: rgba(255, 250, 240, 0.94);
-  border-color: var(--forest-700);
-}
-
-.chapter-deck__notes {
-  position: absolute;
-  z-index: 3;
-  inset: 0;
-  display: grid;
-  grid-template-columns: minmax(15rem, 0.38fr) minmax(0, 0.62fr);
-  color: var(--ink);
-  background: rgba(247, 248, 243, 0.98);
-}
-
-.chapter-deck__notes-heading {
-  display: flex;
-  padding: clamp(2rem, 4vw, 3.5rem);
-  flex-direction: column;
-  justify-content: center;
-  background: var(--paper-deep);
-  border-right: 1px solid var(--line);
-}
-
-.chapter-deck__notes-heading button {
-  margin-top: 1rem;
-}
-
-.chapter-deck__notes-body {
-  padding: clamp(2rem, 4vw, 3.5rem);
-  overflow-y: auto;
-  scrollbar-color: var(--forest-700) var(--paper-deep);
-}
-
-.chapter-deck__notes-body section + section {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--line);
-}
-
-.chapter-deck__notes-body p {
-  max-width: 62ch;
 }
 
 .chapter-deck__controls {

@@ -11,18 +11,11 @@ type SlideItem = Readonly<{
   summary?: string;
 }>;
 
-type SlideDetail = Readonly<{
-  heading: string;
-  body: string;
-}>;
-
 type ChapterSlide = Readonly<{
-  id: string;
   eyebrow: string;
   title: string;
   lead: string;
   items?: readonly SlideItem[];
-  details?: readonly SlideDetail[];
   visual: number;
   closing?: boolean;
 }>;
@@ -62,6 +55,10 @@ const visuals = [
   },
 ] as const;
 
+const coreVisuals = [1, 2, 4, 5, 7] as const;
+const explanationVisuals = [1, 2, 3, 5, 5, 6, 7] as const;
+const conceptVisuals = [4, 5] as const;
+
 function summarize(text: string): string {
   const firstSentence = text.split(/[。；]/, 1)[0]?.trim();
   return firstSentence ? `${firstSentence}。` : text;
@@ -75,16 +72,13 @@ function inGroups<T>(items: readonly T[], size: number): readonly (readonly T[])
 
 export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterSlide[] {
   const coreSlides = chapter.coreStructure.map((item, index) => ({
-    id: `core-${index + 1}`,
     eyebrow: `理解系统 · ${String(index + 1).padStart(2, "0")}`,
     title: item.title,
     lead: summarize(item.body),
-    details: [{ heading: item.title, body: item.body }],
-    visual: (index + 1) % visuals.length,
+    visual: coreVisuals[index] ?? 0,
   }));
 
   const explanationSlides = inGroups(chapter.explanation, 2).map((group, index) => ({
-    id: `explanation-${index + 1}`,
     eyebrow: "深入理解",
     title: group[0].heading,
     lead: summarize(group[0].body),
@@ -92,67 +86,48 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
       title: item.heading,
       summary: summarize(item.body),
     })),
-    details: group.map((item) => ({ heading: item.heading, body: item.body })),
-    visual: (index + 1) % visuals.length,
+    visual: explanationVisuals[index] ?? 0,
   }));
 
   const conceptSlides = inGroups(chapter.concepts, 5).map((group, index) => ({
-      id: `concepts-${index + 1}`,
       eyebrow: "关键概念",
       title: index === 0 ? "把关键词连成系统" : "继续扩展你的概念地图",
-      lead: "先抓住概念之间的关系，再打开讲义查看完整定义。",
+      lead: "先抓住概念之间的关系，理解它们如何组成同一套系统。",
       items: group.map((concept) => ({
         title: concept.term,
         summary: summarize(concept.meaning),
       })),
-      details: group.map((concept) => ({ heading: concept.term, body: concept.meaning })),
-      visual: (index + 4) % visuals.length,
+      visual: conceptVisuals[index] ?? 0,
     }));
 
   return [
     {
-      id: "opening",
       eyebrow: `第 ${chapter.order} 章`,
       title: chapter.title,
       lead: chapter.problem,
       items: [{ title: "一句话理解", summary: chapter.oneSentence }],
-      details: [
-        { heading: "本章要解决的问题", body: chapter.problem },
-        { heading: "一句话理解", body: chapter.oneSentence },
-      ],
       visual: 0,
     },
     ...coreSlides,
     ...explanationSlides,
     ...conceptSlides,
     {
-      id: "scenarios",
       eyebrow: "落到日常",
       title: "把语音放回真实场景",
       lead: chapter.scenarios[0],
       items: chapter.scenarios.slice(1, 4).map((scenario) => ({ title: scenario })),
-      details: chapter.scenarios.map((scenario, index) => ({
-        heading: `场景 ${index + 1}`,
-        body: scenario,
-      })),
       visual: 3,
     },
     {
-      id: "misconceptions",
       eyebrow: "校正方向",
       title: "这些误区会把你拉回原点",
       lead: chapter.misconceptions[0],
       items: chapter.misconceptions.slice(1, 4).map((misconception) => ({
         title: misconception,
       })),
-      details: chapter.misconceptions.map((misconception, index) => ({
-        heading: `误区 ${index + 1}`,
-        body: misconception,
-      })),
       visual: 1,
     },
     {
-      id: "practice",
       eyebrow: "从理解到行动",
       title: "让新能力与现实发生接触",
       lead: chapter.actionPrompt.question,
@@ -171,13 +146,11 @@ export function ChapterDeck({
 }>) {
   const slides = buildChapterSlides(chapter);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [notesOpen, setNotesOpen] = useState(false);
   const current = slides[currentIndex];
   const visual = visuals[current.visual];
 
   function goTo(index: number) {
     setCurrentIndex(Math.max(0, Math.min(index, slides.length - 1)));
-    setNotesOpen(false);
   }
 
   useEffect(() => {
@@ -189,13 +162,10 @@ export function ChapterDeck({
       ) return;
       if (event.key === "ArrowLeft") {
         setCurrentIndex((index) => Math.max(0, index - 1));
-        setNotesOpen(false);
       }
       if (event.key === "ArrowRight") {
         setCurrentIndex((index) => Math.min(slides.length - 1, index + 1));
-        setNotesOpen(false);
       }
-      if (event.key === "Escape") setNotesOpen(false);
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -239,44 +209,15 @@ export function ChapterDeck({
         </div>
 
         <div className="chapter-deck__visual">
-          <Image src={visual.src} alt={visual.alt} fill sizes="(max-width: 1180px) 52vw, 620px" />
+          <Image
+            src={visual.src}
+            alt={visual.alt}
+            fill
+            sizes="(max-width: 1180px) 52vw, 620px"
+            unoptimized
+          />
         </div>
 
-        {current.details?.length ? (
-          <button
-            type="button"
-            className="chapter-deck__notes-button"
-            aria-expanded={notesOpen}
-            aria-controls={`deck-notes-${current.id}`}
-            onClick={() => setNotesOpen(true)}
-          >
-            展开完整讲义
-          </button>
-        ) : null}
-
-        {notesOpen && current.details ? (
-          <aside
-            id={`deck-notes-${current.id}`}
-            className="chapter-deck__notes"
-            aria-label={`${current.title}完整讲义`}
-          >
-            <div className="chapter-deck__notes-heading">
-              <p>{current.eyebrow}</p>
-              <h2>完整讲义</h2>
-              <button type="button" onClick={() => setNotesOpen(false)}>
-                返回幻灯片
-              </button>
-            </div>
-            <div className="chapter-deck__notes-body">
-              {current.details.map((detail) => (
-                <section key={detail.heading}>
-                  <h3>{detail.heading}</h3>
-                  <p>{detail.body}</p>
-                </section>
-              ))}
-            </div>
-          </aside>
-        ) : null}
       </div>
 
       <footer className="chapter-deck__controls">

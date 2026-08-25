@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chapter01 } from "@/content/chapters/chapter-01";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
@@ -59,7 +59,7 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText("2 / 8")).toBeInTheDocument();
   });
 
-  it("keeps complete explanatory content available while paging", () => {
+  it("pages through concepts, scenarios and misconceptions", () => {
     render(
       <ChapterWorkspace
         chapter={publishedChapterFixture}
@@ -74,11 +74,7 @@ describe("ChapterWorkspace", () => {
     for (let index = 0; index < 4; index += 1) fireEvent.click(next);
 
     expect(screen.getByText(publishedChapterFixture.concepts[0].term)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "展开完整讲义" }));
-    const notes = screen.getByRole("complementary", { name: /完整讲义/ });
-    expect(within(notes).getByText(publishedChapterFixture.concepts[0].meaning)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "返回幻灯片" }));
+    expect(screen.queryByRole("button", { name: "展开完整讲义" })).not.toBeInTheDocument();
     fireEvent.click(next);
     expect(screen.getByText(publishedChapterFixture.scenarios[0])).toBeInTheDocument();
     fireEvent.click(next);
