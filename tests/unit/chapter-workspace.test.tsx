@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chapter01 } from "@/content/chapters/chapter-01";
+import { chapter02Draft } from "@/content/drafts/chapter-02";
+import { chapterSchema } from "@/content/schema";
+import { getChapterBySlug } from "@/content/chapters/registry";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
-import { buildChapterSlides } from "@/src/components/chapter-deck";
+import { buildChapterSlides, ChapterDeck } from "@/src/components/chapter-deck";
 import { ChapterWorkspace } from "@/src/components/chapter-workspace";
 
 const progressResponse = {
@@ -40,6 +43,18 @@ describe("ChapterWorkspace", () => {
 
   it("turns the full first chapter into an 18-slide deck", () => {
     expect(buildChapterSlides(chapter01)).toHaveLength(18);
+  });
+
+  it("keeps chapter 02 unpublished while its draft uses its own visuals and scenarios", () => {
+    expect(chapterSchema.safeParse(chapter02Draft).success).toBe(true);
+    expect(getChapterBySlug("chapter-02")?.status).toBe("awaiting_audio");
+    render(<ChapterDeck chapter={chapter02Draft} onEnterPractice={vi.fn()} />);
+    expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-02/");
+    const next = screen.getByRole("button", { name: /下一页/ });
+    const scenarioIndex = buildChapterSlides(chapter02Draft).findIndex(slide => slide.eyebrow === "落到日常");
+    for (let index = 0; index < scenarioIndex; index += 1) fireEvent.click(next);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把协作语感用在真实任务中");
+    expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-02/");
   });
 
   it("supports keyboard paging", () => {

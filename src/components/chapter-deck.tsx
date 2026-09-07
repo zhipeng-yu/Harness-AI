@@ -58,6 +58,12 @@ const visuals = [
 const coreVisuals = [1, 2, 4, 5, 7] as const;
 const explanationVisuals = [1, 2, 3, 5, 5, 6, 7] as const;
 const conceptVisuals = [4, 5] as const;
+const chapter02Visuals = [
+  { src: "/illustrations/chapter-02/real-task.png", alt: "口述真实目标、整理规划卡片，再与 AI 搭建第一版作品" },
+  { src: "/illustrations/chapter-02/learn-by-feedback.png", alt: "检查失败的积木桥，通过讨论与重建从错误中学习" },
+  { src: "/illustrations/chapter-02/local-context.png", alt: "零散资料进入本地有序档案，供不同 AI 工具调用" },
+  { src: "/illustrations/chapter-02/reason-verify.png", alt: "围绕多个作品方案进行比较、测试、检查与迭代" },
+] as const;
 
 function summarize(text: string): string {
   const firstSentence = text.split(/[。；]/, 1)[0]?.trim();
@@ -71,11 +77,12 @@ function inGroups<T>(items: readonly T[], size: number): readonly (readonly T[])
 }
 
 export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterSlide[] {
+  const isChapter02 = chapter.id === "chapter-02";
   const coreSlides = chapter.coreStructure.map((item, index) => ({
     eyebrow: `理解系统 · ${String(index + 1).padStart(2, "0")}`,
     title: item.title,
     lead: summarize(item.body),
-    visual: coreVisuals[index] ?? 0,
+    visual: isChapter02 ? index : coreVisuals[index] ?? 0,
   }));
 
   const explanationSlides = inGroups(chapter.explanation, 2).map((group, index) => ({
@@ -86,7 +93,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
       title: item.heading,
       summary: summarize(item.body),
     })),
-    visual: explanationVisuals[index] ?? 0,
+    visual: isChapter02 ? ([0, 1, 1, 2, 2, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
   }));
 
   const conceptSlides = inGroups(chapter.concepts, 5).map((group, index) => ({
@@ -97,7 +104,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
         title: concept.term,
         summary: summarize(concept.meaning),
       })),
-      visual: conceptVisuals[index] ?? 0,
+      visual: isChapter02 ? (index === 0 ? 1 : 2) : conceptVisuals[index] ?? 0,
     }));
 
   return [
@@ -113,10 +120,10 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
     ...conceptSlides,
     {
       eyebrow: "落到日常",
-      title: "把语音放回真实场景",
+      title: isChapter02 ? "把协作语感用在真实任务中" : "把语音放回真实场景",
       lead: chapter.scenarios[0],
       items: chapter.scenarios.slice(1, 4).map((scenario) => ({ title: scenario })),
-      visual: 3,
+      visual: isChapter02 ? 0 : 3,
     },
     {
       eyebrow: "校正方向",
@@ -131,7 +138,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
       eyebrow: "从理解到行动",
       title: "让新能力与现实发生接触",
       lead: chapter.actionPrompt.question,
-      visual: 7,
+      visual: isChapter02 ? 3 : 7,
       closing: true,
     },
   ];
@@ -147,7 +154,8 @@ export function ChapterDeck({
   const slides = buildChapterSlides(chapter);
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = slides[currentIndex];
-  const visual = visuals[current.visual];
+  const chapterVisuals = chapter.id === "chapter-02" ? chapter02Visuals : visuals;
+  const visual = chapterVisuals[current.visual] ?? chapterVisuals[0];
 
   function goTo(index: number) {
     setCurrentIndex(Math.max(0, Math.min(index, slides.length - 1)));
