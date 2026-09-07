@@ -1,10 +1,11 @@
 import { publishedChapterFixture } from "../fixtures/published-chapter";
 import { chapterSchema, type ChapterDefinition } from "../schema";
 import { chapter01 } from "./chapter-01";
+import { chapter02 } from "./chapter-02";
 
 const chapterCatalog: readonly ChapterDefinition[] = [
   chapter01,
-  { id: "chapter-02", slug: "chapter-02", order: 2, title: "第2章（等待音频）", status: "awaiting_audio" },
+  chapter02,
   { id: "chapter-03", slug: "chapter-03", order: 3, title: "第3章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-04", slug: "chapter-04", order: 4, title: "第4章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-05", slug: "chapter-05", order: 5, title: "第5章（等待音频）", status: "awaiting_audio" },

@@ -1,6 +1,7 @@
 import { chapterSchema } from "@/content/schema";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
 import { chapter01 } from "@/content/chapters/chapter-01";
+import { chapter02 } from "@/content/chapters/chapter-02";
 
 async function loadRegistry(environment: Record<string, string | undefined> = {}) {
   vi.resetModules();
@@ -76,13 +77,14 @@ describe("chapter content contract", () => {
     ).toThrow();
   });
 
-  it("exposes one published chapter and 17 awaiting-audio chapters by default", async () => {
+  it("exposes two published chapters and 16 awaiting-audio chapters by default", async () => {
     const { getChapters } = await loadRegistry();
     const chapters = getChapters();
 
     expect(chapters).toHaveLength(18);
     expect(chapters[0]).toEqual(chapter01);
-    expect(chapters.slice(1).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
+    expect(chapters[1]).toEqual(chapter02);
+    expect(chapters.slice(2).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
     expect(new Set(chapters.map((chapter) => chapter.id)).size).toBe(18);
     expect(new Set(chapters.map((chapter) => chapter.slug)).size).toBe(18);
     expect(chapters.map((chapter) => chapter.order)).toEqual([
@@ -110,6 +112,7 @@ describe("chapter content contract", () => {
 
     expect(chapters).toHaveLength(18);
     expect(chapters[0]).toEqual(publishedChapterFixture);
-    expect(chapters.slice(1).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
+    expect(chapters[1]).toEqual(chapter02);
+    expect(chapters.slice(2).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
   });
 });

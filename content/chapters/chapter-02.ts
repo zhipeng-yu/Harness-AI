@@ -1,7 +1,6 @@
 import type { ChapterDefinition } from "../schema";
 
-// 待用户审批；published 仅用于校验现有内容契约，不接入正式 registry。
-export const chapter02Draft: Extract<ChapterDefinition, { status: "published" }> = {
+export const chapter02: Extract<ChapterDefinition, { status: "published" }> = {
   id: "chapter-02",
   slug: "chapter-02",
   order: 2,
