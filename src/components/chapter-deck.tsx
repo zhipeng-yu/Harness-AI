@@ -195,7 +195,7 @@ export function ChapterDeck({
       <div className="chapter-deck__slide" aria-live="polite">
         <div className="chapter-deck__copy">
           <p className="chapter-deck__eyebrow">{current.eyebrow}</p>
-          <h1>{current.title}</h1>
+          <h1>{current.title.replaceAll("Vibe Coding", "Vibe\u00a0Coding")}</h1>
           <p className="chapter-deck__lead">{current.lead}</p>
 
           {current.items?.length ? (
