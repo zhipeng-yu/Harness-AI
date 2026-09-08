@@ -19,7 +19,7 @@ npm.cmd install
 npm.cmd run db:migrate
 ```
 
-日常双击 `scripts\Start-Harness.cmd` 启动，双击 `scripts\Stop-Harness.cmd` 停止。网站地址是 <http://127.0.0.1:3000>。启动器使用 Next.js 开发服务器，便于本机内容更新后直接生效。
+日常双击 `scripts\Start-Harness.cmd` 启动，双击 `scripts\Stop-Harness.cmd` 停止。网站地址是 <http://127.0.0.1:3001>。启动器使用 Next.js 开发服务器，便于本机内容更新后直接生效。
 
 也可以在终端运行：
 

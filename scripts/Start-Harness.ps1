@@ -18,10 +18,10 @@ try {
   }
 
   $portInUse = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() |
-    Where-Object { $_.Port -eq 3000 } |
+    Where-Object { $_.Port -eq 3001 } |
     Select-Object -First 1
   if ($null -ne $portInUse) {
-    throw 'Port 3000 is already in use.'
+    throw 'Port 3001 is already in use.'
   }
 
   $nodePath = (Get-Command node -ErrorAction Stop).Source
@@ -31,7 +31,7 @@ try {
     '--hostname',
     '127.0.0.1',
     '--port',
-    '3000'
+    '3001'
   ) -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
 
   $deadline = [DateTime]::UtcNow.AddSeconds($ReadinessTimeoutSeconds)
@@ -40,7 +40,7 @@ try {
     $process.Refresh()
     if ($process.HasExited) { throw 'The website process exited during startup.' }
     try {
-      $response = Invoke-WebRequest -Uri 'http://127.0.0.1:3000' -UseBasicParsing -TimeoutSec 1
+      $response = Invoke-WebRequest -Uri 'http://127.0.0.1:3001' -UseBasicParsing -TimeoutSec 1
       if ($response.StatusCode -lt 500) {
         $ready = $true
         break
@@ -58,8 +58,8 @@ try {
     startTime = $process.StartTime.ToUniversalTime().ToString('O')
   } | ConvertTo-Json | Set-Content -LiteralPath $serverFile -Encoding utf8
 
-  if (-not $SkipBrowser) { Start-Process 'http://127.0.0.1:3000' }
-  Write-Host 'Harness is running at http://127.0.0.1:3000'
+  if (-not $SkipBrowser) { Start-Process 'http://127.0.0.1:3001' }
+  Write-Host 'Harness is running at http://127.0.0.1:3001'
 } catch {
   if ($null -ne $process) {
     $process.Refresh()
