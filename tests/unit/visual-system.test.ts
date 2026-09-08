@@ -17,8 +17,10 @@ function contrast(left: string, right: string) {
 }
 
 it("keeps the exact approved action token while using readable ink on paper for action states", () => {
-  expect(css).toContain("--action: #c86b35;");
+  expect(css).toContain("--action: #335bce;");
   expect(css).toMatch(/\.next-action a\s*{[\s\S]*?color:\s*var\(--ink\);[\s\S]*?background:\s*var\(--paper\);[\s\S]*?border:[^;}]*var\(--action\)/);
   expect(css).toMatch(/\[role="alert"\]\s*{[\s\S]*?color:\s*var\(--ink\);[\s\S]*?background:\s*var\(--paper\);[\s\S]*?border-left:[^;}]*var\(--action\)/);
-  expect(contrast("#18352d", "#f7f8f3")).toBeGreaterThanOrEqual(4.5);
+  const token = (name: string) => css.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))![1];
+  expect(contrast(token("ink"), token("paper"))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(token("action"), "#ffffff")).toBeGreaterThanOrEqual(4.5);
 });

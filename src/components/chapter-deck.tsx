@@ -221,7 +221,7 @@ export function ChapterDeck({
             src={visual.src}
             alt={visual.alt}
             fill
-            sizes="(max-width: 1180px) 52vw, 620px"
+            sizes="(max-width: 980px) 360px, (max-width: 1228px) 40vw, 472px"
             unoptimized
           />
         </div>

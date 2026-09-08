@@ -1,13 +1,13 @@
 :root {
-  --forest-900: #173e34;
-  --forest-700: #315b47;
-  --paper: #f7f8f3;
-  --sage: #dce8d9;
-  --action: #c86b35;
-  --ink: #18352d;
-  --paper-deep: #eef1e8;
-  --line: #b9c9bb;
-  --muted: #5e756b;
+  --heading: #171717;
+  --control: #242424;
+  --paper: #f5f5f5;
+  --surface-muted: #eeeeee;
+  --action: #335bce;
+  --ink: #222222;
+  --paper-deep: #eeeeee;
+  --line: #d9d9d9;
+  --muted: #636363;
   --reading: 72ch;
   color: var(--ink);
   background: var(--paper);
@@ -27,27 +27,26 @@ body {
   min-width: 320px;
   margin: 0;
   background-color: var(--paper);
-  background-image: linear-gradient(90deg, transparent 0, transparent calc(50% - 590px), rgba(49, 91, 71, 0.06) calc(50% - 590px), rgba(49, 91, 71, 0.06) calc(50% - 589px), transparent calc(50% - 589px), transparent calc(50% + 589px), rgba(49, 91, 71, 0.06) calc(50% + 589px), rgba(49, 91, 71, 0.06) calc(50% + 590px), transparent calc(50% + 590px));
   line-height: 1.75;
 }
 
 ::selection {
   color: var(--paper);
-  background: var(--forest-700);
+  background: var(--control);
 }
 
 a {
-  color: var(--forest-700);
+  color: var(--control);
   text-underline-offset: 0.22em;
   text-decoration-thickness: 1px;
 }
 
 a:hover {
-  color: var(--forest-900);
+  color: var(--heading);
 }
 
 :where(a, button, textarea, input, summary):focus-visible {
-  outline: 3px solid var(--forest-700);
+  outline: 3px solid var(--control);
   outline-offset: 3px;
 }
 
@@ -56,8 +55,8 @@ h2,
 h3,
 h4 {
   margin-block: 0 0.65em;
-  color: var(--forest-900);
-  font-family: "Songti SC", "STSong", "SimSun", serif;
+  color: var(--heading);
+  font-family: inherit;
   font-weight: 700;
   line-height: 1.25;
   text-wrap: balance;
@@ -84,9 +83,9 @@ ol {
 }
 
 .site-header {
-  color: var(--paper);
-  background: var(--forest-900);
-  border-bottom: 5px solid var(--sage);
+  color: var(--heading);
+  background: #ffffff;
+  border-bottom: 1px solid var(--line);
 }
 
 .site-header__inner {
@@ -103,7 +102,7 @@ ol {
 .site-header__brand {
   margin: 0;
   color: inherit;
-  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-family: inherit;
   font-size: 1.18rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -111,7 +110,7 @@ ol {
 
 .site-header__note {
   margin: 0;
-  color: var(--sage);
+  color: var(--muted);
   font-size: 0.75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -153,7 +152,7 @@ main {
 .page > section {
   margin-block: 4.5rem;
   padding-top: 1.4rem;
-  border-top: 1px solid var(--forest-700);
+  border-top: 1px solid var(--control);
 }
 
 .next-action {
@@ -162,8 +161,8 @@ main {
   gap: 1rem 3rem;
   padding: 2rem clamp(1.25rem, 4vw, 3rem);
   color: var(--paper);
-  background: var(--forest-900);
-  border-top: 0.5rem solid var(--sage);
+  background: var(--heading);
+  border-top: 0.5rem solid var(--surface-muted);
 }
 
 .next-action h2,
@@ -177,7 +176,7 @@ main {
 
 .next-action p {
   margin: 0;
-  color: var(--sage);
+  color: var(--surface-muted);
 }
 
 .next-action a {
@@ -213,7 +212,7 @@ main {
 
 .open-loop dd {
   margin: 0;
-  font-family: "Songti SC", "STSong", "SimSun", serif;
+  font-family: inherit;
   font-size: 2.4rem;
   font-weight: 700;
 }
@@ -243,16 +242,16 @@ main {
   top: 1.2rem;
   left: 0.9rem;
   width: 2.2rem;
-  color: var(--forest-700);
-  font-family: "Songti SC", "STSong", "SimSun", serif;
+  color: var(--control);
+  font-family: inherit;
   font-size: 0.8rem;
   content: counter(list-item, decimal-leading-zero);
 }
 
 .chapter-map a,
 .chapter-map strong {
-  color: var(--forest-900);
-  font-family: "Songti SC", "STSong", "SimSun", serif;
+  color: var(--heading);
+  font-family: inherit;
   font-size: 1.05rem;
   font-weight: 700;
 }
@@ -279,6 +278,7 @@ main {
 
 .chapter-deck {
   width: 100%;
+  container-type: inline-size;
 }
 
 .chapter-deck__header,
@@ -301,13 +301,13 @@ main {
   height: 4px;
   margin-block: 0.75rem 1rem;
   overflow: hidden;
-  background: var(--sage);
+  background: var(--surface-muted);
 }
 
 .chapter-deck__progress span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--action), #e7ae43);
+  background: var(--action);
   transition: width 180ms ease;
 }
 
@@ -315,11 +315,10 @@ main {
   position: relative;
   display: grid;
   aspect-ratio: 16 / 9;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  overflow: hidden;
-  background: #fffaf0;
-  border: 1px solid rgba(49, 91, 71, 0.22);
-  box-shadow: 0 24px 70px rgba(23, 62, 52, 0.13);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  grid-template-rows: minmax(0, 1fr);
+  background: #ffffff;
+  border: 1px solid var(--line);
 }
 
 .chapter-deck__copy {
@@ -327,76 +326,76 @@ main {
   z-index: 1;
   display: flex;
   min-width: 0;
-  padding: clamp(2rem, 4.2vw, 4rem);
+  padding: 3cqw;
   flex-direction: column;
   justify-content: center;
 }
 
 .chapter-deck__eyebrow {
-  margin-bottom: 0.7rem;
+  margin-bottom: 1cqw;
   color: var(--action);
-  font-size: 0.72rem;
+  font-size: 1.05cqw;
   font-weight: 800;
   letter-spacing: 0.16em;
 }
 
 .chapter-deck__slide h1 {
-  max-width: 13ch;
-  font-size: clamp(2rem, 3.7vw, 3.8rem);
-  letter-spacing: -0.035em;
+  max-width: none;
+  margin-bottom: 1.6cqw;
+  font-size: 3.1cqw;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
 }
 
 .chapter-deck__lead {
-  display: -webkit-box;
-  max-width: 40ch;
-  margin-bottom: 1rem;
-  overflow: hidden;
-  color: #294c41;
-  font-size: clamp(0.9rem, 1.25vw, 1.05rem);
+  margin-bottom: 1.4cqw;
+  color: var(--ink);
+  font-size: 1.45cqw;
   line-height: 1.65;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
 }
 
 .chapter-deck__items {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0.8cqw;
 }
 
 .chapter-deck__items > div {
   display: grid;
-  padding: 0.6rem 0.7rem;
-  gap: 0.18rem;
-  background: rgba(220, 232, 217, 0.66);
-  border-left: 3px solid var(--action);
-  font-size: 0.75rem;
-  line-height: 1.4;
+  padding: 1cqw;
+  gap: 0.4cqw;
+  align-content: start;
+  background: var(--surface-muted);
+  border-left: 2px solid var(--action);
+  font-size: 1.28cqw;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.chapter-deck__items > div:only-child {
+  grid-column: 1 / -1;
 }
 
 .chapter-deck__items strong {
-  color: var(--forest-900);
+  color: var(--heading);
 }
 
 .chapter-deck__items span {
-  display: -webkit-box;
-  overflow: hidden;
-  color: var(--muted);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  color: var(--ink);
 }
 
 .chapter-deck__visual {
   position: relative;
   min-width: 0;
-  background: #fffaf0;
+  background: #ffffff;
 }
 
 .chapter-deck__visual::after {
   position: absolute;
   inset: 0 auto 0 0;
   width: 14%;
-  background: linear-gradient(90deg, #fffaf0, transparent);
+  background: linear-gradient(90deg, #ffffff, transparent);
   content: "";
 }
 
@@ -416,14 +415,14 @@ main {
 .chapter-deck__page-button {
   min-width: 7.5rem;
   margin: 0;
-  color: var(--forest-900);
+  color: var(--heading);
   background: transparent;
 }
 
 .chapter-deck__page-button:last-child {
   margin-left: auto;
   color: var(--paper);
-  background: var(--forest-700);
+  background: var(--control);
 }
 
 .chapter-workspace__stages,
@@ -439,13 +438,13 @@ main {
 }
 
 .chapter-workspace__content:focus {
-  outline: 3px solid var(--sage);
+  outline: 3px solid var(--surface-muted);
   outline-offset: 0.75rem;
 }
 
 .chapter-workspace__eyebrow {
   margin-bottom: 0.5rem;
-  color: var(--forest-700);
+  color: var(--control);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -464,7 +463,7 @@ main {
 .chapter-workspace__summary {
   padding: 1.15rem;
   background: var(--paper-deep);
-  border-top: 3px solid var(--forest-700);
+  border-top: 3px solid var(--control);
 }
 
 .chapter-workspace__summary h2 {
@@ -509,9 +508,9 @@ main {
   width: 1.9rem;
   height: 1.9rem;
   place-items: center;
-  color: var(--forest-700);
+  color: var(--control);
   background: var(--paper);
-  border: 1px solid var(--forest-700);
+  border: 1px solid var(--control);
   border-radius: 50%;
 }
 
@@ -522,7 +521,7 @@ main {
 
 .progress-stepper [aria-current="step"] span {
   color: var(--paper);
-  background: var(--forest-700);
+  background: var(--control);
 }
 
 form {
@@ -532,7 +531,7 @@ form {
 
 label {
   margin-top: 0.8rem;
-  color: var(--forest-900);
+  color: var(--heading);
   font-weight: 700;
 }
 
@@ -542,7 +541,7 @@ input {
   min-height: 7.5rem;
   padding: 0.85rem 0.95rem;
   color: var(--ink);
-  background: #fffef9;
+  background: #ffffff;
   border: 1px solid var(--line);
   border-radius: 0;
   font: inherit;
@@ -552,7 +551,7 @@ input {
 
 textarea:hover,
 input:hover {
-  border-color: var(--forest-700);
+  border-color: var(--control);
 }
 
 button {
@@ -560,8 +559,8 @@ button {
   margin-top: 0.8rem;
   padding: 0.65rem 1rem;
   color: var(--paper);
-  background: var(--forest-700);
-  border: 1px solid var(--forest-700);
+  background: var(--control);
+  border: 1px solid var(--control);
   border-radius: 0;
   font: inherit;
   font-weight: 700;
@@ -570,8 +569,8 @@ button {
 }
 
 button:hover:not(:disabled) {
-  color: var(--forest-900);
-  background: var(--sage);
+  color: var(--heading);
+  background: var(--surface-muted);
 }
 
 button:disabled {
@@ -593,7 +592,7 @@ details {
 }
 
 summary {
-  color: var(--forest-900);
+  color: var(--heading);
   font-weight: 700;
   cursor: pointer;
 }
@@ -602,7 +601,7 @@ summary {
   margin-block: 1.5rem 3rem;
   padding: 1.5rem 0 0 1.5rem;
   border-top: 1px solid var(--line);
-  border-left: 4px solid var(--sage);
+  border-left: 4px solid var(--surface-muted);
 }
 
 .system-module > dl {
