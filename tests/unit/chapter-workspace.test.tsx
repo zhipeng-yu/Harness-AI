@@ -41,8 +41,34 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
-  it("turns the full first chapter into an 18-slide deck", () => {
-    expect(buildChapterSlides(chapter01)).toHaveLength(18);
+  it.each([chapter01, chapter02])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
+    const slides = buildChapterSlides(chapter);
+    const displayed = slides.flatMap(slide => [slide.lead, ...(slide.items ?? []).flatMap(item => [item.title, item.summary])]);
+    for (const text of [
+      ...chapter.coreStructure.map(item => item.body),
+      ...chapter.explanation.map(item => item.body),
+      ...chapter.concepts.map(item => item.meaning),
+      ...chapter.scenarios,
+      ...chapter.misconceptions,
+    ]) expect(displayed).toContain(text);
+    expect(slides.filter(slide => slide.eyebrow === "深入理解")).toHaveLength(chapter.explanation.length);
+  });
+
+  it("jumps to a complete article from the directory and enters practice from the last page", () => {
+    const onEnterPractice = vi.fn();
+    render(<ChapterDeck chapter={chapter01} onEnterPractice={onEnterPractice} />);
+    const slides = buildChapterSlides(chapter01);
+    const articleIndex = slides.findIndex(slide => slide.eyebrow === "深入理解");
+    const directory = screen.getByRole("combobox", { name: "阅读目录" });
+    fireEvent.change(directory, { target: { value: String(articleIndex) } });
+    for (const paragraph of chapter01.explanation[0].body.split("\n\n")) {
+      expect(screen.getByText(paragraph)).toBeInTheDocument();
+    }
+    fireEvent.keyDown(directory, { key: "ArrowRight" });
+    expect(directory).toHaveValue(String(articleIndex));
+    fireEvent.change(directory, { target: { value: String(slides.length - 1) } });
+    fireEvent.click(screen.getByRole("button", { name: "进入实践" }));
+    expect(onEnterPractice).toHaveBeenCalledOnce();
   });
 
   it("publishes chapter 02 with its own visuals and scenarios", () => {
@@ -70,7 +96,7 @@ describe("ChapterWorkspace", () => {
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
 
-    expect(screen.getByText(publishedChapterFixture.coreStructure[0].title)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(publishedChapterFixture.coreStructure[0].title);
     expect(screen.getByText("2 / 8")).toBeInTheDocument();
   });
 

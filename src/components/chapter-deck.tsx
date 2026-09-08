@@ -56,7 +56,7 @@ const visuals = [
 ] as const;
 
 const coreVisuals = [1, 2, 4, 5, 7] as const;
-const explanationVisuals = [1, 2, 3, 5, 5, 6, 7] as const;
+const explanationVisuals = [0, 1, 2, 3, 1, 4, 5, 4, 5, 6, 5, 5, 7] as const;
 const conceptVisuals = [4, 5] as const;
 const chapter02Visuals = [
   { src: "/illustrations/chapter-02/real-task.png", alt: "口述真实目标、整理规划卡片，再与 AI 搭建第一版作品" },
@@ -64,11 +64,6 @@ const chapter02Visuals = [
   { src: "/illustrations/chapter-02/local-context.png", alt: "零散资料进入本地有序档案，供不同 AI 工具调用" },
   { src: "/illustrations/chapter-02/reason-verify.png", alt: "围绕多个作品方案进行比较、测试、检查与迭代" },
 ] as const;
-
-function summarize(text: string): string {
-  const firstSentence = text.split(/[。；]/, 1)[0]?.trim();
-  return firstSentence ? `${firstSentence}。` : text;
-}
 
 function inGroups<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
   return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
@@ -79,30 +74,26 @@ function inGroups<T>(items: readonly T[], size: number): readonly (readonly T[])
 export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterSlide[] {
   const isChapter02 = chapter.id === "chapter-02";
   const coreSlides = chapter.coreStructure.map((item, index) => ({
-    eyebrow: `理解系统 · ${String(index + 1).padStart(2, "0")}`,
+    eyebrow: `阅读路线 · ${String(index + 1).padStart(2, "0")}`,
     title: item.title,
-    lead: summarize(item.body),
+    lead: item.body,
     visual: isChapter02 ? index : coreVisuals[index] ?? 0,
   }));
 
-  const explanationSlides = inGroups(chapter.explanation, 2).map((group, index) => ({
+  const explanationSlides = chapter.explanation.map((item, index) => ({
     eyebrow: "深入理解",
-    title: group[0].heading,
-    lead: summarize(group[0].body),
-    items: group.slice(1).map((item) => ({
-      title: item.heading,
-      summary: summarize(item.body),
-    })),
-    visual: isChapter02 ? ([0, 1, 1, 2, 2, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
+    title: item.heading,
+    lead: item.body,
+    visual: isChapter02 ? ([0, 0, 1, 1, 1, 3, 0, 2, 2, 2, 2, 3, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
   }));
 
-  const conceptSlides = inGroups(chapter.concepts, 5).map((group, index) => ({
+  const conceptSlides = inGroups(chapter.concepts, 3).map((group, index) => ({
       eyebrow: "关键概念",
       title: index === 0 ? "把关键词连成系统" : "继续扩展你的概念地图",
       lead: "先抓住概念之间的关系，理解它们如何组成同一套系统。",
       items: group.map((concept) => ({
         title: concept.term,
-        summary: summarize(concept.meaning),
+        summary: concept.meaning,
       })),
       visual: isChapter02 ? (index === 0 ? 1 : 2) : conceptVisuals[index] ?? 0,
     }));
@@ -118,22 +109,22 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
     ...coreSlides,
     ...explanationSlides,
     ...conceptSlides,
-    {
+    ...inGroups(chapter.scenarios, 3).map((group) => ({
       eyebrow: "落到日常",
       title: isChapter02 ? "把协作语感用在真实任务中" : "把语音放回真实场景",
-      lead: chapter.scenarios[0],
-      items: chapter.scenarios.slice(1, 4).map((scenario) => ({ title: scenario })),
+      lead: group[0],
+      items: group.slice(1).map((scenario) => ({ title: scenario })),
       visual: isChapter02 ? 0 : 3,
-    },
-    {
+    })),
+    ...inGroups(chapter.misconceptions, 3).map((group) => ({
       eyebrow: "校正方向",
       title: "这些误区会把你拉回原点",
-      lead: chapter.misconceptions[0],
-      items: chapter.misconceptions.slice(1, 4).map((misconception) => ({
+      lead: group[0],
+      items: group.slice(1).map((misconception) => ({
         title: misconception,
       })),
       visual: 1,
-    },
+    })),
     {
       eyebrow: "从理解到行动",
       title: "让新能力与现实发生接触",
@@ -181,7 +172,7 @@ export function ChapterDeck({
   }, [slides.length]);
 
   return (
-    <section className="chapter-deck" aria-label="章节幻灯片">
+    <section className="chapter-deck" aria-label="章节阅读">
       <header className="chapter-deck__header">
         <p>学习阶段 · 理解系统</p>
         <p aria-live="polite">
@@ -192,11 +183,24 @@ export function ChapterDeck({
         <span style={{ width: `${((currentIndex + 1) / slides.length) * 100}%` }} />
       </div>
 
-      <div className="chapter-deck__slide" aria-live="polite">
+      <label className="chapter-deck__toc">
+        阅读目录
+        <select value={currentIndex} onChange={(event) => goTo(Number(event.target.value))}>
+          {slides.map((slide, index) => (
+            <option key={index} value={index}>
+              {index + 1}. {slide.eyebrow} · {slide.title}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <article className="chapter-deck__slide" aria-live="polite">
         <div className="chapter-deck__copy">
           <p className="chapter-deck__eyebrow">{current.eyebrow}</p>
           <h1>{current.title.replaceAll("Vibe Coding", "Vibe\u00a0Coding")}</h1>
-          <p className="chapter-deck__lead">{current.lead}</p>
+          <div className="chapter-deck__lead">
+            {current.lead.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+          </div>
 
           {current.items?.length ? (
             <div className="chapter-deck__items">
@@ -226,7 +230,7 @@ export function ChapterDeck({
           />
         </div>
 
-      </div>
+      </article>
 
       <footer className="chapter-deck__controls">
         <button
