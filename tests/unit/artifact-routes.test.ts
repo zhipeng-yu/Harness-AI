@@ -108,7 +108,7 @@ describe("action-plan and Artifact route validation", () => {
     const unpublished = await putActionPlan(
       jsonRequest("http://localhost/api/action-plans", "PUT", {
         ...actionPlanBody,
-        chapterId: "chapter-03",
+        chapterId: "chapter-04",
       }),
     );
 
@@ -130,7 +130,7 @@ describe("action-plan and Artifact route validation", () => {
     const unpublished = await postArtifact(
       jsonRequest("http://localhost/api/artifacts", "POST", {
         ...artifactBody,
-        chapterId: "chapter-03",
+        chapterId: "chapter-04",
       }),
     );
 

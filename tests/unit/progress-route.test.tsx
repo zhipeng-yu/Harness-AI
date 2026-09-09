@@ -50,7 +50,7 @@ describe("PUT /api/progress", () => {
 
   it("rejects progress for an awaiting-audio chapter", async () => {
     const response = await PUT(
-      progressRequest({ chapterId: "chapter-03", learningStage: "understanding" }),
+      progressRequest({ chapterId: "chapter-04", learningStage: "understanding" }),
     );
 
     expect(response.status).toBe(404);
@@ -89,7 +89,7 @@ describe("PUT /api/progress", () => {
 });
 
 describe("chapter page publication boundary", () => {
-  it.each(["does-not-exist", "chapter-03"])("returns 404 for slug %s", async (slug) => {
+  it.each(["does-not-exist", "chapter-04"])("returns 404 for slug %s", async (slug) => {
     await expect(
       ChapterPage({ params: Promise.resolve({ slug }) }),
     ).rejects.toThrow(/404/);

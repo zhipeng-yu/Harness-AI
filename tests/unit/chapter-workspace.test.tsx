@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chapter01 } from "@/content/chapters/chapter-01";
 import { chapter02 } from "@/content/chapters/chapter-02";
+import { chapter03 } from "@/content/chapters/chapter-03";
 import { chapterSchema } from "@/content/schema";
 import { getChapterBySlug } from "@/content/chapters/registry";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
@@ -41,7 +42,7 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
-  it.each([chapter01, chapter02])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
+  it.each([chapter01, chapter02, chapter03])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
     const slides = buildChapterSlides(chapter);
     const displayed = slides.flatMap(slide => [slide.lead, ...(slide.items ?? []).flatMap(item => [item.title, item.summary])]);
     for (const text of [
@@ -81,6 +82,25 @@ describe("ChapterWorkspace", () => {
     for (let index = 0; index < scenarioIndex; index += 1) fireEvent.click(next);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把协作语感用在真实任务中");
     expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-02/");
+  });
+
+  it("publishes the complete third chapter with its own visuals and three-day practice", () => {
+    expect(chapterSchema.safeParse(chapter03).success).toBe(true);
+    expect(getChapterBySlug("chapter-03")).toEqual(chapter03);
+    const slides = buildChapterSlides(chapter03);
+    expect(slides).toHaveLength(51);
+    const enterPractice = vi.fn();
+    render(<ChapterDeck chapter={chapter03} onEnterPractice={enterPractice} />);
+    const directory = screen.getByRole("combobox", { name: "阅读目录" });
+    const scenario = slides.findIndex(slide => slide.eyebrow === "落到日常");
+    fireEvent.change(directory, { target: { value: String(scenario) } });
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把分工与判断用在真实任务中");
+    expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-03/");
+    fireEvent.change(directory, { target: { value: String(slides.length - 1) } });
+    expect(screen.getByText(chapter03.actionPrompt.question)).toBeInTheDocument();
+    expect(screen.getByRole("img").getAttribute("src")).toContain("three-days.svg");
+    fireEvent.click(screen.getByRole("button", { name: "进入实践" }));
+    expect(enterPractice).toHaveBeenCalledOnce();
   });
 
   it("supports keyboard paging", () => {
