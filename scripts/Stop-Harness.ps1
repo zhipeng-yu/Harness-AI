@@ -30,7 +30,8 @@ try {
     throw 'The PID now belongs to another process; nothing was stopped.'
   }
 
-  Stop-Process -InputObject $process -Force
+  & taskkill.exe /PID $process.Id /T /F | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw 'The website process tree could not be stopped.' }
   if (-not $process.WaitForExit(10000)) { throw 'The website process did not stop.' }
   Remove-Item -LiteralPath $serverFile -Force
   Write-Host 'Harness is stopped.'
