@@ -3,12 +3,13 @@ import { chapterSchema, type ChapterDefinition } from "../schema";
 import { chapter01 } from "./chapter-01";
 import { chapter02 } from "./chapter-02";
 import { chapter03 } from "./chapter-03";
+import { chapter04 } from "./chapter-04";
 
 const chapterCatalog: readonly ChapterDefinition[] = [
   chapter01,
   chapter02,
   chapter03,
-  { id: "chapter-04", slug: "chapter-04", order: 4, title: "第4章（等待音频）", status: "awaiting_audio" },
+  chapter04,
   { id: "chapter-05", slug: "chapter-05", order: 5, title: "第5章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-06", slug: "chapter-06", order: 6, title: "第6章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-07", slug: "chapter-07", order: 7, title: "第7章（等待音频）", status: "awaiting_audio" },

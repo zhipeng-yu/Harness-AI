@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { chapter01 } from "@/content/chapters/chapter-01";
 import { chapter02 } from "@/content/chapters/chapter-02";
 import { chapter03 } from "@/content/chapters/chapter-03";
+import { chapter04 } from "@/content/chapters/chapter-04";
 import { chapterSchema } from "@/content/schema";
 import { getChapterBySlug } from "@/content/chapters/registry";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
@@ -42,7 +43,7 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
-  it.each([chapter01, chapter02, chapter03])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
+  it.each([chapter01, chapter02, chapter03, chapter04])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
     const slides = buildChapterSlides(chapter);
     const displayed = slides.flatMap(slide => [slide.lead, ...(slide.items ?? []).flatMap(item => [item.title, item.summary])]);
     for (const text of [
@@ -55,14 +56,14 @@ describe("ChapterWorkspace", () => {
     expect(slides.filter(slide => slide.eyebrow === "深入理解")).toHaveLength(chapter.explanation.length);
   });
 
-  it("jumps to a complete article from the directory and enters practice from the last page", () => {
+  it.each([chapter01, chapter04])("jumps to a complete article and enters practice from the last page in $id", (chapter) => {
     const onEnterPractice = vi.fn();
-    render(<ChapterDeck chapter={chapter01} onEnterPractice={onEnterPractice} />);
-    const slides = buildChapterSlides(chapter01);
+    render(<ChapterDeck chapter={chapter} onEnterPractice={onEnterPractice} />);
+    const slides = buildChapterSlides(chapter);
     const articleIndex = slides.findIndex(slide => slide.eyebrow === "深入理解");
     const directory = screen.getByRole("combobox", { name: "阅读目录" });
     fireEvent.change(directory, { target: { value: String(articleIndex) } });
-    for (const paragraph of chapter01.explanation[0].body.split("\n\n")) {
+    for (const paragraph of chapter.explanation[0].body.split("\n\n")) {
       expect(screen.getByText(paragraph)).toBeInTheDocument();
     }
     fireEvent.keyDown(directory, { key: "ArrowRight" });
@@ -99,6 +100,32 @@ describe("ChapterWorkspace", () => {
     fireEvent.change(directory, { target: { value: String(slides.length - 1) } });
     expect(screen.getByText(chapter03.actionPrompt.question)).toBeInTheDocument();
     expect(screen.getByRole("img").getAttribute("src")).toContain("three-days.svg");
+    fireEvent.click(screen.getByRole("button", { name: "进入实践" }));
+    expect(enterPractice).toHaveBeenCalledOnce();
+  });
+
+  it("publishes all 54 pages of chapter 04 with its own visuals and workflow practice", () => {
+    expect(chapterSchema.safeParse(chapter04).success).toBe(true);
+    expect(getChapterBySlug("chapter-04")).toEqual(chapter04);
+    const slides = buildChapterSlides(chapter04);
+    expect(slides).toHaveLength(54);
+    const enterPractice = vi.fn();
+    render(<ChapterDeck chapter={chapter04} onEnterPractice={enterPractice} />);
+    const directory = screen.getByRole("combobox", { name: "阅读目录" });
+    const images = ["workflow.svg", "feedback.svg", "expand-evaluate.svg"];
+    slides.forEach((slide, index) => {
+      fireEvent.change(directory, { target: { value: String(index) } });
+      expect(images[slide.visual]).toBeDefined();
+      expect(screen.getByRole("img")).toHaveAttribute("src", `/illustrations/chapter-04/${images[slide.visual]}`);
+      if (slide.eyebrow === "落到日常") {
+        expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把流程重构用在真实任务中");
+      }
+    });
+    expect(new Set(slides.map(slide => slide.visual)).size).toBe(3);
+    for (const paragraph of chapter04.actionPrompt.question.split("\n\n")) {
+      expect(screen.getByText(paragraph)).toBeInTheDocument();
+    }
+    expect(screen.getByRole("img").getAttribute("src")).toContain("feedback.svg");
     fireEvent.click(screen.getByRole("button", { name: "进入实践" }));
     expect(enterPractice).toHaveBeenCalledOnce();
   });

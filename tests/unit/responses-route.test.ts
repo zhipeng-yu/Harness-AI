@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PUT } from "@/app/api/responses/route";
 import { responseRepository } from "@/src/features/responses/repository";
 import { openDatabase } from "@/src/lib/db/connection";
@@ -14,13 +14,12 @@ function responseRequest(body: unknown) {
   });
 }
 
-function usePublishedFixture() {
+beforeEach(() => {
   const databasePath = join(mkdtempSync(join(tmpdir(), "harness-responses-")), "test.sqlite");
   process.env.HARNESS_DB_PATH = databasePath;
   process.env.HARNESS_TEST = "1";
   process.env.HARNESS_CONTENT_FIXTURE = "published-chapter";
-  return databasePath;
-}
+});
 
 afterEach(() => {
   delete process.env.HARNESS_DB_PATH;
@@ -57,11 +56,10 @@ describe("PUT /api/responses", () => {
   });
 
   it.each([
-    ["an unpublished chapter", "chapter-04", "chapter-04-reflection-01"],
+    ["an unpublished chapter", "chapter-05", "chapter-05-reflection-01"],
     ["a foreign prompt", "chapter-01", "chapter-01-reflection-99"],
     ["an artifact field", "chapter-01", "chapter-01-artifact-problem"],
   ])("rejects %s", async (_case, chapterId, promptId) => {
-    usePublishedFixture();
     const response = await PUT(responseRequest({ chapterId, promptId, value: "回答" }));
 
     expect(response.status).toBe(404);
@@ -73,7 +71,7 @@ describe("PUT /api/responses", () => {
     "chapter-01-action-01",
     "chapter-01-review-01",
   ])("writes the published %s prompt for the fixed local owner", async (promptId) => {
-    const databasePath = usePublishedFixture();
+    const databasePath = process.env.HARNESS_DB_PATH;
     const response = await PUT(
       responseRequest({
         chapterId: "chapter-01",

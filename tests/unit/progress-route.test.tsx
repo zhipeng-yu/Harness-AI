@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ChapterPage from "@/app/chapters/[slug]/page";
 import { PUT } from "@/app/api/progress/route";
 import { progressRepository } from "@/src/features/progress/repository";
@@ -14,6 +14,12 @@ function progressRequest(body: unknown) {
     body: JSON.stringify(body),
   });
 }
+
+beforeEach(() => {
+  process.env.HARNESS_DB_PATH = join(mkdtempSync(join(tmpdir(), "harness-progress-")), "test.sqlite");
+  process.env.HARNESS_TEST = "1";
+  process.env.HARNESS_CONTENT_FIXTURE = "published-chapter";
+});
 
 afterEach(() => {
   delete process.env.HARNESS_DB_PATH;
@@ -50,22 +56,17 @@ describe("PUT /api/progress", () => {
 
   it("rejects progress for an awaiting-audio chapter", async () => {
     const response = await PUT(
-      progressRequest({ chapterId: "chapter-04", learningStage: "understanding" }),
+      progressRequest({ chapterId: "chapter-05", learningStage: "understanding" }),
     );
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "chapter_not_published" });
   });
 
-  it("writes published chapter progress for the fixed local owner", async () => {
-    const databasePath = join(mkdtempSync(join(tmpdir(), "harness-progress-")), "test.sqlite");
-    process.env.HARNESS_DB_PATH = databasePath;
-    process.env.HARNESS_TEST = "1";
-    process.env.HARNESS_CONTENT_FIXTURE = "published-chapter";
-
+  it.each(["chapter-01", "chapter-04"])("writes %s progress for the fixed local owner", async (chapterId) => {
     const response = await PUT(
       progressRequest({
-        chapterId: "chapter-01",
+        chapterId,
         learningStage: "learned",
         ownerId: "owner-other",
       }),
@@ -76,12 +77,12 @@ describe("PUT /api/progress", () => {
       learningStage: "learned",
       updatedAt: expect.any(String),
     });
-    const db = openDatabase(databasePath);
+    const db = openDatabase(process.env.HARNESS_DB_PATH);
     try {
-      expect(progressRepository(db).get("owner-local", "chapter-01")?.learningStage).toBe(
+      expect(progressRepository(db).get("owner-local", chapterId)?.learningStage).toBe(
         "learned",
       );
-      expect(progressRepository(db).get("owner-other", "chapter-01")).toBeUndefined();
+      expect(progressRepository(db).get("owner-other", chapterId)).toBeUndefined();
     } finally {
       db.close();
     }
@@ -89,7 +90,7 @@ describe("PUT /api/progress", () => {
 });
 
 describe("chapter page publication boundary", () => {
-  it.each(["does-not-exist", "chapter-04"])("returns 404 for slug %s", async (slug) => {
+  it.each(["does-not-exist", "chapter-05"])("returns 404 for slug %s", async (slug) => {
     await expect(
       ChapterPage({ params: Promise.resolve({ slug }) }),
     ).rejects.toThrow(/404/);
