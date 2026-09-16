@@ -8,11 +8,12 @@
 - 第四章《管理的本质：重构 AI 工作流，把自己的瓶颈上移》含 39 节讲解、约 1.48 万字正文；作业是把一个真实瓶颈转成可传递流程，检验试跑、产出放大与判断上移。
 - 页面使用浅灰画布、白色圆角面板和灰度插画，正文为主、高度自然展开、窄窗口单栏。配图位于 `public/illustrations/chapter-01/` 至 `chapter-04/`；第三、四章 SVG 均为方法示意，不复原视频画面。
 - 四章发布前均已完成完整性验证备份，项目内临时转录材料已删除，用户源音频未修改。第四章依据与视觉缺口见 [内容说明](docs/chapter-04-review.md)。
+- 本机 `artifacts/presentations/harness-ai-campus-sharing/` 已生成基于第 1–11 章整理的校园公益分享材料：22 页 PPTX，以及一页 A4《AI 协作任务卡》的 DOCX、PDF。PPT 前 20 页为 40 分钟主讲、后 2 页为附录，每页含讲者备注；材料不进入 Git。
 - 私人数据仅保存于 `data/harness.sqlite`；数据库和已有备份不得删除、覆盖或用于测试。网站运行时不调用 AI，不提供原音频或逐字稿。
 - 仓库为 <https://github.com/zhipeng-yu/Harness-AI>，完成验证后直接提交并推送 `main`。数据库、备份、音频、转录稿与运行文件不进入 Git。
 
 ## 下一步
 
-等待第五章完整音频，按内容工作流整理、审阅、审批后发布。本机已有 `.tools/faster-whisper/` 和 `.tools/whisper-models/`，优先复用。前两章插画仍以灰度显示，后续重绘黑白风格。
+下一步先用现有 PPT 与任务卡完成一次线下试讲，记录时间、学生能否填完任务卡、哪些表述需要缩短，再据真实反馈更新材料。课程网站的第 5–11 章仍未发布；后续按内容工作流逐章整理、审阅和审批。本机已有 `.tools/faster-whisper/` 和 `.tools/whisper-models/`，优先复用。
 
 完整边界以 [AGENTS.md](AGENTS.md) 和 [内容工作流](docs/content-workflow.md) 为准。
