@@ -3,22 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChapterDefinition } from "@/content/schema";
 import type { ActionPlan } from "@/src/features/actions/repository";
-import type { ArtifactStatus, LearningStage } from "@/src/types/learning";
+import type {
+  Artifact,
+  ArtifactVersion,
+} from "@/src/features/artifacts/repository";
+import type { LearningStage } from "@/src/types/learning";
 import { ActionPlanForm } from "./action-plan-form";
-import { ArtifactEditor } from "./artifact-editor";
-import { ArtifactReviewForm, isArtifactState } from "./artifact-review-form";
+import { ArtifactEditor, isArtifactPayload } from "./artifact-editor";
+import { ArtifactReviewForm } from "./artifact-review-form";
+import { ArtifactVersionHistory } from "./artifact-version-history";
 import { AutosaveField } from "./autosave-field";
 import { ChapterDeck } from "./chapter-deck";
 import { ProgressStepper } from "./progress-stepper";
+import { artifactStatusLabels } from "./system-module-card";
 
 type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
 
-export type ArtifactSummary = Readonly<{
-  id: string;
-  title: string;
-  status: ArtifactStatus;
-  currentVersion: number;
-}>;
+export type ArtifactSummary = Artifact;
 
 type ChapterWorkspaceProps = Readonly<{
   chapter: PublishedChapter;
@@ -27,6 +28,31 @@ type ChapterWorkspaceProps = Readonly<{
   actionPlan: ActionPlan | null;
   artifact: ArtifactSummary | null;
 }>;
+
+function ArtifactVersionContent({
+  fields,
+  version,
+}: Readonly<{
+  fields: PublishedChapter["artifactTemplate"]["fields"];
+  version: ArtifactVersion;
+}>) {
+  const values = [
+    version.problem,
+    version.principles,
+    version.rules,
+    version.successCriteria,
+  ];
+  return (
+    <dl className="artifact-content">
+      {fields.map((field, index) => (
+        <div key={field.id}>
+          <dt>{field.label}</dt>
+          <dd>{values[index]}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
 
 export function ChapterWorkspace({
   chapter,
@@ -86,12 +112,8 @@ export function ChapterWorkspace({
         });
         if (!response.ok) throw new Error("artifact_transition_failed");
         const payload: unknown = await response.json();
-        if (!isArtifactState(payload)) throw new Error("invalid_artifact_state");
-        setCurrentArtifact((previous) =>
-          previous
-            ? { ...previous, status: payload.status, currentVersion: payload.version }
-            : previous,
-        );
+        if (!isArtifactPayload(payload)) throw new Error("invalid_artifact_state");
+        setCurrentArtifact(payload);
       } catch {
         setArtifactError(true);
       } finally {
@@ -101,21 +123,13 @@ export function ChapterWorkspace({
     [currentArtifact],
   );
 
-  const acceptArtifactState = useCallback(
-    (state: { status: ArtifactStatus; version: number }) => {
-      setCurrentArtifact((previous) =>
-        previous
-          ? { ...previous, status: state.status, currentVersion: state.version }
-          : previous,
-      );
-    },
-    [],
-  );
-
   const enterPractice = useCallback(() => {
     practiceStart.current?.focus({ preventScroll: true });
     practiceStart.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+  const currentVersion = currentArtifact?.versions.find(
+    (version) => version.version === currentArtifact.currentVersion,
+  );
 
   return (
     <main className="chapter-workspace">
@@ -157,27 +171,51 @@ export function ChapterWorkspace({
         </section>
 
         <section>
-          <h2>创建 Artifact</h2>
+          <h2>实践成果卡（Artifact）</h2>
+          <p>
+            它把本章方法变成一轮可检查的实践。草稿可以修改；点击开始实践后，
+            当前版本会锁定，等真实结果回来再复盘并生成下一版。
+          </p>
           {!currentArtifact ? (
             <ArtifactEditor
               chapterId={chapter.id}
               title={chapter.artifactTemplate.title}
               fields={chapter.artifactTemplate.fields}
-              onCreated={setCurrentArtifact}
+              onSaved={setCurrentArtifact}
             />
-          ) : (
-            <div>
-              <p>{currentArtifact.title}</p>
-              <p>版本 {currentArtifact.currentVersion}</p>
-              <p>{currentArtifact.status}</p>
+          ) : currentVersion ? (
+            <div className="artifact-workflow">
+              <h3>{currentArtifact.title}</h3>
+              <p>
+                v{currentArtifact.currentVersion} · {artifactStatusLabels[currentArtifact.status]}
+              </p>
               {currentArtifact.status === "draft" ? (
-                <button
-                  type="button"
-                  disabled={artifactSaving}
-                  onClick={() => void updateArtifactState("start_practice")}
-                >
-                  开始实践
-                </button>
+                <ArtifactEditor
+                  key={`${currentArtifact.id}-${currentArtifact.currentVersion}`}
+                  chapterId={chapter.id}
+                  title={currentArtifact.title}
+                  fields={chapter.artifactTemplate.fields}
+                  artifactId={currentArtifact.id}
+                  version={currentVersion}
+                  onSaved={setCurrentArtifact}
+                />
+              ) : (
+                <ArtifactVersionContent
+                  fields={chapter.artifactTemplate.fields}
+                  version={currentVersion}
+                />
+              )}
+              {currentArtifact.status === "draft" ? (
+                <div>
+                  <p>修改后请先保存草稿，再开始实践。</p>
+                  <button
+                    type="button"
+                    disabled={artifactSaving}
+                    onClick={() => void updateArtifactState("start_practice")}
+                  >
+                    开始实践并锁定 v{currentArtifact.currentVersion}
+                  </button>
+                </div>
               ) : null}
               {currentArtifact.status === "in_practice" ? (
                 <button
@@ -192,7 +230,7 @@ export function ChapterWorkspace({
                 <ArtifactReviewForm
                   artifactId={currentArtifact.id}
                   prompts={chapter.reviewPrompts}
-                  onSaved={acceptArtifactState}
+                  onSaved={setCurrentArtifact}
                 />
               ) : null}
               {currentArtifact.status === "reviewed" ? (
@@ -213,10 +251,24 @@ export function ChapterWorkspace({
                   归档 Artifact
                 </button>
               ) : null}
+              {currentArtifact.versions.length > 1 || currentArtifact.reviews.length > 0 ? (
+                <ArtifactVersionHistory
+                  versions={currentArtifact.versions}
+                  reviews={currentArtifact.reviews}
+                  fieldLabels={[
+                    chapter.artifactTemplate.fields[0].label,
+                    chapter.artifactTemplate.fields[1].label,
+                    chapter.artifactTemplate.fields[2].label,
+                    chapter.artifactTemplate.fields[3].label,
+                  ]}
+                />
+              ) : null}
               {artifactError ? (
-                <p role="alert">Artifact 状态更新失败，请重试。</p>
+                <p role="alert">实践成果卡状态更新失败，请重试。</p>
               ) : null}
             </div>
+          ) : (
+            <p role="alert">找不到当前版本，请刷新页面重试。</p>
           )}
         </section>
 
@@ -240,15 +292,15 @@ export function ChapterWorkspace({
         ) : (
           <p>尚未制定行动</p>
         )}
-        <h2>Artifact 摘要</h2>
+        <h2>实践成果卡</h2>
         {currentArtifact ? (
           <div>
             <p>{currentArtifact.title}</p>
             <p>版本 {currentArtifact.currentVersion}</p>
-            <p>{currentArtifact.status}</p>
+            <p>{artifactStatusLabels[currentArtifact.status]}</p>
           </div>
         ) : (
-          <p>尚未创建 Artifact</p>
+          <p>尚未创建实践成果卡</p>
         )}
       </aside>
     </main>

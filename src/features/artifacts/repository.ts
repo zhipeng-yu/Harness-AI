@@ -88,6 +88,13 @@ export class ArtifactNotFoundError extends Error {
   }
 }
 
+export class ArtifactNotEditableError extends Error {
+  constructor() {
+    super("Artifact draft is not editable");
+    this.name = "ArtifactNotEditableError";
+  }
+}
+
 function mapVersion(row: ArtifactVersionRow): ArtifactVersion {
   return {
     id: row.id,
@@ -185,6 +192,14 @@ export function artifactRepository(db: DatabaseSync) {
     SET current_version = ?, status = ?, updated_at = ?
     WHERE id = ? AND owner_id = ?
   `);
+  const updateDraftStatement = db.prepare(`
+    UPDATE artifact_versions
+    SET problem = ?, principles = ?, rules = ?, success_criteria = ?
+    WHERE id = ?
+  `);
+  const touchArtifactStatement = db.prepare(`
+    UPDATE artifacts SET updated_at = ? WHERE id = ? AND owner_id = ?
+  `);
 
   function hydrate(row: ArtifactRow): Artifact {
     return {
@@ -225,6 +240,8 @@ export function artifactRepository(db: DatabaseSync) {
   }
 
   return {
+    getById,
+
     createWithVersion(input: {
       ownerId: string;
       chapterId: string;
@@ -268,6 +285,32 @@ export function artifactRepository(db: DatabaseSync) {
       });
 
       return getById(input.ownerId, artifactId)!;
+    },
+
+    updateDraft(
+      ownerId: string,
+      artifactId: string,
+      input: {
+        problem: string;
+        principles: string;
+        rules: string;
+        successCriteria: string;
+      },
+    ): Artifact {
+      return withTransaction(db, () => {
+        const artifact = requireOwnedArtifact(ownerId, artifactId);
+        if (artifact.status !== "draft") throw new ArtifactNotEditableError();
+        const now = new Date().toISOString();
+        updateDraftStatement.run(
+          input.problem,
+          input.principles,
+          input.rules,
+          input.successCriteria,
+          artifact.artifact_version_id,
+        );
+        touchArtifactStatement.run(now, artifactId, ownerId);
+        return getById(ownerId, artifactId)!;
+      });
     },
 
     transition(

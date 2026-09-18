@@ -524,6 +524,34 @@ main {
   font-size: 0.85rem;
 }
 
+.artifact-workflow {
+  padding: 1.5rem;
+  background: var(--paper-deep);
+  border-radius: 20px;
+}
+
+.artifact-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.artifact-content div {
+  padding: 1rem;
+  background: var(--paper);
+  border-radius: 12px;
+}
+
+.artifact-content dt {
+  margin-bottom: 0.35rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.artifact-content dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .progress-stepper {
   display: grid;
   gap: 0;

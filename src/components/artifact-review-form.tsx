@@ -2,30 +2,16 @@
 
 import { useState } from "react";
 import type { ChapterDefinition } from "@/content/schema";
-import type { ArtifactStatus } from "@/src/types/learning";
+import type { Artifact } from "@/src/features/artifacts/repository";
+import { isArtifactPayload } from "./artifact-editor";
 
 type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
-
-export type ArtifactState = { status: ArtifactStatus; version: number };
 
 type ArtifactReviewFormProps = Readonly<{
   artifactId: string;
   prompts: PublishedChapter["reviewPrompts"];
-  onSaved: (state: ArtifactState) => void;
+  onSaved: (artifact: Artifact) => void;
 }>;
-
-const artifactStatuses: ArtifactStatus[] = ["draft", "in_practice", "review_ready", "reviewed", "archived"];
-
-export function isArtifactState(value: unknown): value is ArtifactState {
-  if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Partial<ArtifactState>;
-  return (
-    typeof candidate.status === "string" &&
-    artifactStatuses.includes(candidate.status as ArtifactStatus) &&
-    typeof candidate.version === "number" &&
-    Number.isInteger(candidate.version)
-  );
-}
 
 export function ArtifactReviewForm({ artifactId, prompts, onSaved }: ArtifactReviewFormProps) {
   const [actualResult, setActualResult] = useState("");
@@ -46,7 +32,7 @@ export function ArtifactReviewForm({ artifactId, prompts, onSaved }: ArtifactRev
       });
       if (!response.ok) throw new Error("artifact_review_not_saved");
       const payload: unknown = await response.json();
-      if (!isArtifactState(payload)) throw new Error("invalid_artifact_state");
+      if (!isArtifactPayload(payload)) throw new Error("invalid_artifact_state");
       onSaved(payload);
     } catch {
       setSaveError(true);

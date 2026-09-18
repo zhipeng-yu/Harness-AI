@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  ArtifactNotEditableError,
   ArtifactNotFoundError,
   artifactRepository,
 } from "@/src/features/artifacts/repository";
@@ -38,7 +39,7 @@ afterEach(() => {
 });
 
 describe("Artifact repository", () => {
-  it("creates the Artifact and immutable version 1 together", () => {
+  it("creates the Artifact and version 1 together", () => {
     const created = createArtifact();
 
     expect(created).toMatchObject({
@@ -65,6 +66,52 @@ describe("Artifact repository", () => {
     expect(
       db.prepare("SELECT COUNT(*) AS count FROM artifact_versions").get(),
     ).toEqual({ count: 1 });
+  });
+
+  it("updates the current draft without creating another version", () => {
+    const created = createArtifact();
+
+    const saved = artifactRepository(db).updateDraft(
+      "owner-local",
+      created.id,
+      {
+        problem: "A clearer problem",
+        principles: "A clearer principle",
+        rules: "A clearer rule",
+        successCriteria: "A clearer result",
+      },
+    );
+
+    expect(saved.versions).toHaveLength(1);
+    expect(saved.versions[0]).toMatchObject({
+      version: 1,
+      problem: "A clearer problem",
+      principles: "A clearer principle",
+      rules: "A clearer rule",
+      successCriteria: "A clearer result",
+    });
+  });
+
+  it("rejects draft edits after practice starts", () => {
+    const created = createArtifact();
+    artifactRepository(db).transition(
+      "owner-local",
+      created.id,
+      "start_practice",
+    );
+
+    expect(() =>
+      artifactRepository(db).updateDraft("owner-local", created.id, {
+        problem: "Too late",
+        principles: firstVersion.principles,
+        rules: firstVersion.rules,
+        successCriteria: firstVersion.successCriteria,
+      }),
+    ).toThrow(ArtifactNotEditableError);
+    expect(
+      artifactRepository(db).getById("owner-local", created.id)?.versions[0]
+        ?.problem,
+    ).toBe(firstVersion.problem);
   });
 
   it("rolls back the Artifact when creating version 1 fails", () => {

@@ -244,9 +244,18 @@ describe("action-plan and Artifact route persistence", () => {
     const created = (await createdResponse.json()) as { id: string };
 
     const started = await patchRequest(created.id, { event: "start_practice" });
-    expect(await started.json()).toEqual({ status: "in_practice", version: 1 });
+    await expect(started.json()).resolves.toMatchObject({
+      id: created.id,
+      status: "in_practice",
+      currentVersion: 1,
+      versions: [{ version: 1 }],
+    });
     const ready = await patchRequest(created.id, { event: "mark_review_ready" });
-    expect(await ready.json()).toEqual({ status: "review_ready", version: 1 });
+    await expect(ready.json()).resolves.toMatchObject({
+      id: created.id,
+      status: "review_ready",
+      currentVersion: 1,
+    });
     const reviewed = await patchRequest(created.id, {
       event: "submit_review",
       actualResult: "Shipped the chosen outcome",
@@ -254,7 +263,51 @@ describe("action-plan and Artifact route persistence", () => {
       nextChange: "Shorten the focus window",
       createNextVersion: true,
     });
-    expect(await reviewed.json()).toEqual({ status: "draft", version: 2 });
+    await expect(reviewed.json()).resolves.toMatchObject({
+      id: created.id,
+      status: "draft",
+      currentVersion: 2,
+      versions: [{ version: 1 }, { version: 2 }],
+      reviews: [{ nextChange: "Shorten the focus window" }],
+    });
+  });
+
+  it("saves draft fields and rejects edits after practice starts", async () => {
+    const createdResponse = await postArtifact(
+      jsonRequest("http://localhost/api/artifacts", "POST", artifactBody),
+    );
+    const created = (await createdResponse.json()) as { id: string };
+    const changed = {
+      event: "save_draft",
+      problem: "A clearer problem",
+      principles: "A clearer principle",
+      rules: "A clearer rule",
+      successCriteria: "A clearer result",
+    };
+
+    const saved = await patchRequest(created.id, changed);
+    await expect(saved.json()).resolves.toMatchObject({
+      status: "draft",
+      versions: [
+        {
+          version: 1,
+          problem: changed.problem,
+          principles: changed.principles,
+          rules: changed.rules,
+          successCriteria: changed.successCriteria,
+        },
+      ],
+    });
+
+    await patchRequest(created.id, { event: "start_practice" });
+    const rejected = await patchRequest(created.id, {
+      ...changed,
+      problem: "Too late",
+    });
+    expect(rejected.status).toBe(409);
+    await expect(rejected.json()).resolves.toEqual({
+      error: "artifact_not_editable",
+    });
   });
 
   it("can create the next version after completing review", async () => {
@@ -271,12 +324,18 @@ describe("action-plan and Artifact route persistence", () => {
       nextChange: "Shorten the focus window",
       createNextVersion: false,
     });
-    expect(await reviewed.json()).toEqual({ status: "reviewed", version: 1 });
+    await expect(reviewed.json()).resolves.toMatchObject({
+      status: "reviewed",
+      currentVersion: 1,
+    });
 
     const next = await patchRequest(created.id, {
       event: "create_next_version",
     });
-    expect(await next.json()).toEqual({ status: "draft", version: 2 });
+    await expect(next.json()).resolves.toMatchObject({
+      status: "draft",
+      currentVersion: 2,
+    });
   });
 
   it("returns a conflict without changing an illegal transition", async () => {

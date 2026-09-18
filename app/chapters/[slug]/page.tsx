@@ -6,24 +6,17 @@ import {
   type ArtifactSummary,
 } from "@/src/components/chapter-workspace";
 import { actionPlanRepository } from "@/src/features/actions/repository";
+import { artifactRepository } from "@/src/features/artifacts/repository";
 import { progressRepository } from "@/src/features/progress/repository";
 import { openDatabase } from "@/src/lib/db/connection";
 import { migrate } from "@/src/lib/db/migrate";
 import { OWNER_ID } from "@/src/lib/owner";
-import type { ArtifactStatus } from "@/src/types/learning";
 
 export const dynamic = "force-dynamic";
 
 type ResponseRow = {
   prompt_id: string;
   value: string;
-};
-
-type ArtifactRow = {
-  id: string;
-  title: string;
-  status: ArtifactStatus;
-  current_version: number;
 };
 
 export default async function ChapterPage({
@@ -48,23 +41,8 @@ export default async function ChapterPage({
       responseRows.map((response) => [response.prompt_id, response.value]),
     );
     const actionPlan = actionPlanRepository(db).get(OWNER_ID, chapter.id) ?? null;
-    const artifactRow = db
-      .prepare(
-        `SELECT id, title, status, current_version
-         FROM artifacts
-         WHERE owner_id = ? AND chapter_id = ? AND archived_at IS NULL
-         ORDER BY updated_at DESC
-         LIMIT 1`,
-      )
-      .get(OWNER_ID, chapter.id) as ArtifactRow | undefined;
-    const artifact: ArtifactSummary | null = artifactRow
-      ? {
-          id: artifactRow.id,
-          title: artifactRow.title,
-          status: artifactRow.status,
-          currentVersion: artifactRow.current_version,
-        }
-      : null;
+    const artifact: ArtifactSummary | null =
+      artifactRepository(db).getByChapter(OWNER_ID, chapter.id) ?? null;
 
     return (
       <ChapterWorkspace

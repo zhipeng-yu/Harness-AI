@@ -2,44 +2,54 @@
 
 import { useState } from "react";
 import type { ChapterDefinition } from "@/content/schema";
+import type {
+  Artifact,
+  ArtifactVersion,
+} from "@/src/features/artifacts/repository";
 import type { ArtifactStatus } from "@/src/types/learning";
 
 type PublishedChapter = Extract<ChapterDefinition, { status: "published" }>;
-
-export type CreatedArtifactSummary = {
-  id: string;
-  title: string;
-  status: ArtifactStatus;
-  currentVersion: number;
-};
 
 type ArtifactEditorProps = Readonly<{
   chapterId: string;
   title: string;
   fields: PublishedChapter["artifactTemplate"]["fields"];
-  onCreated: (artifact: CreatedArtifactSummary) => void;
+  artifactId?: string;
+  version?: ArtifactVersion;
+  onSaved: (artifact: Artifact) => void;
 }>;
 
 const artifactStatuses: ArtifactStatus[] = ["draft", "in_practice", "review_ready", "reviewed", "archived"];
 
-function isCreatedArtifact(value: unknown): value is CreatedArtifactSummary {
+export function isArtifactPayload(value: unknown): value is Artifact {
   if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Partial<CreatedArtifactSummary>;
+  const candidate = value as Partial<Artifact>;
   return (
     typeof candidate.id === "string" &&
     typeof candidate.title === "string" &&
     typeof candidate.status === "string" &&
     artifactStatuses.includes(candidate.status as ArtifactStatus) &&
     typeof candidate.currentVersion === "number" &&
-    Number.isInteger(candidate.currentVersion)
+    Number.isInteger(candidate.currentVersion) &&
+    Array.isArray(candidate.versions) &&
+    Array.isArray(candidate.reviews)
   );
 }
 
-export function ArtifactEditor({ chapterId, title, fields, onCreated }: ArtifactEditorProps) {
-  const [problem, setProblem] = useState("");
-  const [principles, setPrinciples] = useState("");
-  const [rules, setRules] = useState("");
-  const [successCriteria, setSuccessCriteria] = useState("");
+export function ArtifactEditor({
+  chapterId,
+  title,
+  fields,
+  artifactId,
+  version,
+  onSaved,
+}: ArtifactEditorProps) {
+  const [problem, setProblem] = useState(version?.problem ?? "");
+  const [principles, setPrinciples] = useState(version?.principles ?? "");
+  const [rules, setRules] = useState(version?.rules ?? "");
+  const [successCriteria, setSuccessCriteria] = useState(
+    version?.successCriteria ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
@@ -48,15 +58,35 @@ export function ArtifactEditor({ chapterId, title, fields, onCreated }: Artifact
     setSaving(true);
     setSaveError(false);
     try {
-      const response = await fetch("/api/artifacts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterId, title, problem, principles, rules, successCriteria }),
-      });
+      const response = await fetch(
+        artifactId ? `/api/artifacts/${artifactId}` : "/api/artifacts",
+        {
+          method: artifactId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            artifactId
+              ? {
+                  event: "save_draft",
+                  problem,
+                  principles,
+                  rules,
+                  successCriteria,
+                }
+              : {
+                  chapterId,
+                  title,
+                  problem,
+                  principles,
+                  rules,
+                  successCriteria,
+                },
+          ),
+        },
+      );
       if (!response.ok) throw new Error("artifact_not_created");
       const payload: unknown = await response.json();
-      if (!isCreatedArtifact(payload)) throw new Error("invalid_artifact_payload");
-      onCreated(payload);
+      if (!isArtifactPayload(payload)) throw new Error("invalid_artifact_payload");
+      onSaved(payload);
     } catch {
       setSaveError(true);
     } finally {
@@ -66,7 +96,8 @@ export function ArtifactEditor({ chapterId, title, fields, onCreated }: Artifact
 
   return (
     <form onSubmit={save}>
-      <p>{title}</p>
+      <p>{artifactId ? `编辑 v${version?.version ?? ""} 草稿` : title}</p>
+      {version?.revisionNote ? <p>本版调整：{version.revisionNote}</p> : null}
       <label htmlFor={fields[0].id}>{fields[0].label}</label>
       <textarea id={fields[0].id} required value={problem} onChange={(event) => setProblem(event.target.value)} />
       <label htmlFor={fields[1].id}>{fields[1].label}</label>
@@ -75,8 +106,10 @@ export function ArtifactEditor({ chapterId, title, fields, onCreated }: Artifact
       <textarea id={fields[2].id} required value={rules} onChange={(event) => setRules(event.target.value)} />
       <label htmlFor={fields[3].id}>{fields[3].label}</label>
       <textarea id={fields[3].id} required value={successCriteria} onChange={(event) => setSuccessCriteria(event.target.value)} />
-      <button type="submit" disabled={saving}>{saving ? "创建中…" : "创建 Artifact"}</button>
-      {saveError ? <p role="alert">Artifact 创建失败，请重试。</p> : null}
+      <button type="submit" disabled={saving}>
+        {saving ? "保存中…" : artifactId ? "保存草稿" : "创建实践成果卡"}
+      </button>
+      {saveError ? <p role="alert">实践成果卡保存失败，请重试。</p> : null}
     </form>
   );
 }

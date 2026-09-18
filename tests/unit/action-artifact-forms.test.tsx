@@ -5,6 +5,38 @@ import { ActionPlanForm } from "@/src/components/action-plan-form";
 import { ArtifactEditor } from "@/src/components/artifact-editor";
 import { ArtifactReviewForm } from "@/src/components/artifact-review-form";
 import { ChapterWorkspace } from "@/src/components/chapter-workspace";
+import type { Artifact } from "@/src/features/artifacts/repository";
+
+const artifactVersion = {
+  id: "version-01",
+  artifactId: "artifact-01",
+  version: 1,
+  problem: "Server problem",
+  principles: "Server principles",
+  rules: "Server rules",
+  successCriteria: "Server success",
+  revisionNote: "",
+  createdAt: "2026-08-13T00:00:00.000Z",
+};
+
+function artifactFixture(
+  overrides: Partial<Artifact> = {},
+): Artifact {
+  return {
+    id: "artifact-01",
+    ownerId: "owner-local",
+    chapterId: "chapter-01",
+    title: "Focus system",
+    status: "draft",
+    currentVersion: 1,
+    createdAt: "2026-08-13T00:00:00.000Z",
+    updatedAt: "2026-08-13T00:00:00.000Z",
+    archivedAt: null,
+    versions: [artifactVersion],
+    reviews: [],
+    ...overrides,
+  };
+}
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -67,23 +99,18 @@ describe("fixed action and Artifact forms", () => {
   });
 
   it("creates an Artifact from exactly four version text fields", async () => {
-    const saved = {
-      id: "artifact-01",
-      title: "Focus system",
-      status: "draft",
-      currentVersion: 1,
-    };
+    const saved = artifactFixture();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, json: async () => saved }),
     );
-    const onCreated = vi.fn();
+    const onSaved = vi.fn();
     const { container } = render(
       <ArtifactEditor
         chapterId="chapter-01"
         title="Focus system"
         fields={publishedChapterFixture.artifactTemplate.fields}
-        onCreated={onCreated}
+        onSaved={onSaved}
       />,
     );
 
@@ -104,9 +131,9 @@ describe("fixed action and Artifact forms", () => {
       screen.getByRole("textbox", { name: "可观察的成功标准" }),
       { target: { value: "Success" } },
     );
-    fireEvent.click(screen.getByRole("button", { name: "创建 Artifact" }));
+    fireEvent.click(screen.getByRole("button", { name: "创建实践成果卡" }));
 
-    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(saved));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
     expect(fetch).toHaveBeenCalledWith("/api/artifacts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,8 +148,57 @@ describe("fixed action and Artifact forms", () => {
     });
   });
 
+  it("prefills and saves an editable Artifact draft", async () => {
+    const saved = artifactFixture({
+      versions: [{ ...artifactVersion, problem: "Updated problem" }],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => saved }),
+    );
+    const onSaved = vi.fn();
+    render(
+      <ArtifactEditor
+        chapterId="chapter-01"
+        title="Focus system"
+        fields={publishedChapterFixture.artifactTemplate.fields}
+        artifactId="artifact-01"
+        version={artifactVersion}
+        onSaved={onSaved}
+      />,
+    );
+
+    expect(
+      screen.getByRole("textbox", { name: "要解决的现实问题" }),
+    ).toHaveValue("Server problem");
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "要解决的现实问题" }),
+      { target: { value: "Updated problem" } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
+    expect(fetch).toHaveBeenCalledWith("/api/artifacts/artifact-01", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "save_draft",
+        problem: "Updated problem",
+        principles: "Server principles",
+        rules: "Server rules",
+        successCriteria: "Server success",
+      }),
+    });
+  });
+
   it("submits exactly three review text fields and the chosen server action", async () => {
-    const saved = { status: "draft", version: 2 };
+    const saved = artifactFixture({
+      currentVersion: 2,
+      versions: [
+        artifactVersion,
+        { ...artifactVersion, id: "version-02", version: 2 },
+      ],
+    });
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({ ok: true, json: async () => saved }),
@@ -190,7 +266,8 @@ describe("fixed action and Artifact forms", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({ status: "review_ready", version: 1 }),
+        json: async () =>
+          artifactFixture({ status: "review_ready" }),
       }),
     );
     render(
@@ -199,16 +276,13 @@ describe("fixed action and Artifact forms", () => {
         learningStage="understanding"
         savedResponses={{}}
         actionPlan={null}
-        artifact={{
-          id: "artifact-01",
-          title: "Focus system",
-          status: "draft",
-          currentVersion: 1,
-        }}
+        artifact={artifactFixture()}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "开始实践" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "开始实践并锁定 v1" }),
+    );
 
     await waitFor(() =>
       expect(

@@ -6,6 +6,7 @@ import type {
 type ArtifactVersionHistoryProps = Readonly<{
   versions: ArtifactVersion[];
   reviews: ArtifactReview[];
+  fieldLabels?: readonly [string, string, string, string];
 }>;
 
 function formatTime(value: string) {
@@ -19,6 +20,7 @@ function formatTime(value: string) {
 export function ArtifactVersionHistory({
   versions,
   reviews,
+  fieldLabels = ["问题", "原则", "规则", "成功标准"],
 }: ArtifactVersionHistoryProps) {
   const chronologicalVersions = [...versions].sort(
     (left, right) =>
@@ -35,7 +37,7 @@ export function ArtifactVersionHistory({
         );
 
         return (
-          <details key={version.id}>
+          <details key={version.id} open={chronologicalVersions.length <= 3}>
             <summary>
               v{version.version} ·{" "}
               <time dateTime={version.createdAt}>
@@ -44,19 +46,19 @@ export function ArtifactVersionHistory({
             </summary>
             <dl>
               <div>
-                <dt>问题</dt>
+                <dt>{fieldLabels[0]}</dt>
                 <dd>{version.problem}</dd>
               </div>
               <div>
-                <dt>原则</dt>
+                <dt>{fieldLabels[1]}</dt>
                 <dd>{version.principles}</dd>
               </div>
               <div>
-                <dt>规则</dt>
+                <dt>{fieldLabels[2]}</dt>
                 <dd>{version.rules}</dd>
               </div>
               <div>
-                <dt>成功标准</dt>
+                <dt>{fieldLabels[3]}</dt>
                 <dd>{version.successCriteria}</dd>
               </div>
               <div>
