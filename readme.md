@@ -62,6 +62,8 @@ npm.cmd run db:restore -- backups/harness-YYYYMMDD-HHMMSS.sqlite --confirm
 
 本机已有离线转写库 `.tools/faster-whisper/` 和模型 `.tools/whisper-models/`，优先复用；这些工具及 `artifacts/` 均被 Git 忽略，审阅页只在本机存在。
 
+本机 `artifacts/share/Harness-AI课程第1-11章文本.zip` 是可对外阅读的文本包：第 1–11 章均为带准确性说明的离线自动转录稿；文件不进入 Git。
+
 ## 校园公益分享
 
 本机 `artifacts/presentations/harness-ai-campus-sharing/` 保存一套基于第 1–11 章整理的 40 分钟线下分享材料：22 页 PPTX（前 20 页主讲、后 2 页附录）和一页 A4《AI 协作任务卡》的 DOCX、PDF。材料面向无 AI 基础的大四学生，使用四步协作回路与六字段任务卡；不包含原音频、逐字稿或私人数据，不作为课程官方课件。

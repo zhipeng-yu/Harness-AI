@@ -10,6 +10,7 @@
 - 页面使用浅灰画布、白色圆角面板和灰度插画，正文为主、高度自然展开、窄窗口单栏。配图位于 `public/illustrations/chapter-01/` 至 `chapter-04/`；第三、四章 SVG 均为方法示意，不复原视频画面。
 - 四章发布前均已完成完整性验证备份，项目内临时转录材料已删除，用户源音频未修改。第四章依据与视觉缺口见 [内容说明](docs/chapter-04-review.md)。
 - 本机 `artifacts/presentations/harness-ai-campus-sharing/` 已生成基于第 1–11 章整理的校园公益分享材料：22 页 PPTX，以及一页 A4《AI 协作任务卡》的 DOCX、PDF。PPT 前 20 页为 40 分钟主讲、后 2 页为附录，每页含讲者备注；材料不进入 Git。
+- 本机 `artifacts/share/Harness-AI课程第1-11章文本.zip` 保存第 1–11 章离线 Whisper 自动转录稿，逐章文件与合并版均保留准确性说明；该包不进入 Git。第一章新音频已完成差异审阅，补全方案位于 `artifacts/review/chapter-01-audio-gap-review.md`，尚未覆盖已发布内容，等待用户审批。
 - 私人数据仅保存于 `data/harness.sqlite`；数据库和已有备份不得删除、覆盖或用于测试。网站运行时不调用 AI，不提供原音频或逐字稿。
 - 仓库为 <https://github.com/zhipeng-yu/Harness-AI>，完成验证后直接提交并推送 `main`。数据库、备份、音频、转录稿与运行文件不进入 Git。
 
