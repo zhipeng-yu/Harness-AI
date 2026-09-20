@@ -4,6 +4,15 @@ import { chapter01 } from "@/content/chapters/chapter-01";
 import { chapter02 } from "@/content/chapters/chapter-02";
 import { chapter03 } from "@/content/chapters/chapter-03";
 import { chapter04 } from "@/content/chapters/chapter-04";
+import {
+  chapter05,
+  chapter06,
+  chapter07,
+  chapter08,
+  chapter09,
+  chapter10,
+  chapter11,
+} from "@/content/chapters/chapter-05-11";
 import { chapterSchema } from "@/content/schema";
 import { getChapterBySlug } from "@/content/chapters/registry";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
@@ -43,7 +52,7 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
-  it.each([chapter01, chapter02, chapter03, chapter04])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
+  it.each([chapter01, chapter02, chapter03, chapter04, chapter05, chapter06, chapter07, chapter08, chapter09, chapter10, chapter11])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
     const slides = buildChapterSlides(chapter);
     const displayed = slides.flatMap(slide => [slide.lead, ...(slide.items ?? []).flatMap(item => [item.title, item.summary])]);
     for (const text of [
@@ -128,6 +137,16 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByRole("img").getAttribute("src")).toContain("feedback.svg");
     fireEvent.click(screen.getByRole("button", { name: "进入实践" }));
     expect(enterPractice).toHaveBeenCalledOnce();
+  });
+
+  it.each([chapter05, chapter06, chapter07, chapter08, chapter09, chapter10, chapter11])("publishes $id with reviewed content and shared method visuals", (chapter) => {
+    expect(chapterSchema.safeParse(chapter).success).toBe(true);
+    expect(getChapterBySlug(chapter.slug)).toEqual(chapter);
+    const slides = buildChapterSlides(chapter);
+    expect(slides.length).toBeGreaterThan(15);
+    expect(new Set(slides.map((slide) => slide.visual))).toEqual(new Set([0, 1, 2]));
+    render(<ChapterDeck chapter={chapter} onEnterPractice={vi.fn()} />);
+    expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-05-11/");
   });
 
   it("supports keyboard paging", () => {

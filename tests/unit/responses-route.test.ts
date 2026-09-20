@@ -56,7 +56,7 @@ describe("PUT /api/responses", () => {
   });
 
   it.each([
-    ["an unpublished chapter", "chapter-05", "chapter-05-reflection-01"],
+    ["an unpublished chapter", "chapter-12", "chapter-12-reflection-01"],
     ["a foreign prompt", "chapter-01", "chapter-01-reflection-99"],
     ["an artifact field", "chapter-01", "chapter-01-artifact-problem"],
   ])("rejects %s", async (_case, chapterId, promptId) => {

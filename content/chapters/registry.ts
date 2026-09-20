@@ -4,19 +4,28 @@ import { chapter01 } from "./chapter-01";
 import { chapter02 } from "./chapter-02";
 import { chapter03 } from "./chapter-03";
 import { chapter04 } from "./chapter-04";
+import {
+  chapter05,
+  chapter06,
+  chapter07,
+  chapter08,
+  chapter09,
+  chapter10,
+  chapter11,
+} from "./chapter-05-11";
 
 const chapterCatalog: readonly ChapterDefinition[] = [
   chapter01,
   chapter02,
   chapter03,
   chapter04,
-  { id: "chapter-05", slug: "chapter-05", order: 5, title: "第5章（等待音频）", status: "awaiting_audio" },
-  { id: "chapter-06", slug: "chapter-06", order: 6, title: "第6章（等待音频）", status: "awaiting_audio" },
-  { id: "chapter-07", slug: "chapter-07", order: 7, title: "第7章（等待音频）", status: "awaiting_audio" },
-  { id: "chapter-08", slug: "chapter-08", order: 8, title: "第8章（等待音频）", status: "awaiting_audio" },
-  { id: "chapter-09", slug: "chapter-09", order: 9, title: "第9章（等待音频）", status: "awaiting_audio" },
-  { id: "chapter-10", slug: "chapter-10", order: 10, title: "第10章（等待音频）", status: "awaiting_audio" },
-  { id: "chapter-11", slug: "chapter-11", order: 11, title: "第11章（等待音频）", status: "awaiting_audio" },
+  chapter05,
+  chapter06,
+  chapter07,
+  chapter08,
+  chapter09,
+  chapter10,
+  chapter11,
   { id: "chapter-12", slug: "chapter-12", order: 12, title: "第12章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-13", slug: "chapter-13", order: 13, title: "第13章（等待音频）", status: "awaiting_audio" },
   { id: "chapter-14", slug: "chapter-14", order: 14, title: "第14章（等待音频）", status: "awaiting_audio" },

@@ -74,6 +74,11 @@ const chapter04Visuals = [
   { src: "/illustrations/chapter-04/feedback.svg", alt: "方法示意：产出进入真实场景，反馈回到下一轮流程" },
   { src: "/illustrations/chapter-04/expand-evaluate.svg", alt: "方法示意：展开有区别的候选，再集中比较与判断" },
 ] as const;
+const chapter05To11Visuals = [
+  { src: "/illustrations/chapter-05-11/context-flow.svg", alt: "方法示意：目标、材料与边界进入处理回路，形成可检查输出" },
+  { src: "/illustrations/chapter-05-11/reality-loop.svg", alt: "方法示意：内部判断形成最小创造物，通过现实反馈完成更新" },
+  { src: "/illustrations/chapter-05-11/system-layers.svg", alt: "方法示意：人的意图与治理连接工作流、Agent、脚本和数据" },
+] as const;
 const chapter04ExplanationVisuals = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2, 2, 1, 0, 0, 2, 1, 0, 0, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 0, 1] as const;
 
 function inGroups<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
@@ -86,18 +91,19 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
   const isChapter02 = chapter.id === "chapter-02";
   const isChapter03 = chapter.id === "chapter-03";
   const isChapter04 = chapter.id === "chapter-04";
+  const isChapter05To11 = chapter.order >= 5 && chapter.order <= 11;
   const coreSlides = chapter.coreStructure.map((item, index) => ({
     eyebrow: `阅读路线 · ${String(index + 1).padStart(2, "0")}`,
     title: item.title,
     lead: item.body,
-    visual: isChapter04 ? ([0, 0, 1, 1][index] ?? 0) : isChapter03 ? ([0, 0, 1, 2][index] ?? 0) : isChapter02 ? index : coreVisuals[index] ?? 0,
+    visual: isChapter05To11 ? index % 3 : isChapter04 ? ([0, 0, 1, 1][index] ?? 0) : isChapter03 ? ([0, 0, 1, 2][index] ?? 0) : isChapter02 ? index : coreVisuals[index] ?? 0,
   }));
 
   const explanationSlides = chapter.explanation.map((item, index) => ({
     eyebrow: "深入理解",
     title: item.heading,
     lead: item.body,
-    visual: isChapter04 ? chapter04ExplanationVisuals[index] ?? 0 : isChapter03 ? (index >= 35 ? 2 : index >= 18 && index <= 25 ? 1 : 0) : isChapter02 ? ([0, 0, 1, 1, 1, 3, 0, 2, 2, 2, 2, 3, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
+    visual: isChapter05To11 ? index % 3 : isChapter04 ? chapter04ExplanationVisuals[index] ?? 0 : isChapter03 ? (index >= 35 ? 2 : index >= 18 && index <= 25 ? 1 : 0) : isChapter02 ? ([0, 0, 1, 1, 1, 3, 0, 2, 2, 2, 2, 3, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
   }));
 
   const conceptSlides = inGroups(chapter.concepts, 3).map((group, index) => ({
@@ -108,7 +114,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
         title: concept.term,
         summary: concept.meaning,
       })),
-      visual: isChapter04 ? ([0, 0, 2, 1][index] ?? 0) : isChapter03 ? (index === 2 ? 2 : index) : isChapter02 ? (index === 0 ? 1 : 2) : conceptVisuals[index] ?? 0,
+      visual: isChapter05To11 ? index % 3 : isChapter04 ? ([0, 0, 2, 1][index] ?? 0) : isChapter03 ? (index === 2 ? 2 : index) : isChapter02 ? (index === 0 ? 1 : 2) : conceptVisuals[index] ?? 0,
     }));
 
   return [
@@ -124,10 +130,10 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
     ...conceptSlides,
     ...inGroups(chapter.scenarios, 3).map((group) => ({
       eyebrow: "落到日常",
-      title: isChapter04 ? "把流程重构用在真实任务中" : isChapter03 ? "把分工与判断用在真实任务中" : isChapter02 ? "把协作语感用在真实任务中" : "把语音放回真实场景",
+      title: isChapter05To11 ? "把本章方法用在真实任务中" : isChapter04 ? "把流程重构用在真实任务中" : isChapter03 ? "把分工与判断用在真实任务中" : isChapter02 ? "把协作语感用在真实任务中" : "把语音放回真实场景",
       lead: group[0],
       items: group.slice(1).map((scenario) => ({ title: scenario })),
-      visual: isChapter04 || isChapter03 || isChapter02 ? 0 : 3,
+      visual: isChapter05To11 ? 1 : isChapter04 || isChapter03 || isChapter02 ? 0 : 3,
     })),
     ...inGroups(chapter.misconceptions, 3).map((group) => ({
       eyebrow: "校正方向",
@@ -136,13 +142,13 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
       items: group.slice(1).map((misconception) => ({
         title: misconception,
       })),
-      visual: 1,
+      visual: isChapter05To11 ? 2 : 1,
     })),
     {
       eyebrow: "从理解到行动",
       title: "让新能力与现实发生接触",
       lead: chapter.actionPrompt.question,
-      visual: isChapter04 ? 1 : isChapter03 ? 2 : isChapter02 ? 3 : 7,
+      visual: isChapter05To11 ? 1 : isChapter04 ? 1 : isChapter03 ? 2 : isChapter02 ? 3 : 7,
       closing: true,
     },
   ];
@@ -158,7 +164,7 @@ export function ChapterDeck({
   const slides = buildChapterSlides(chapter);
   const [currentIndex, setCurrentIndex] = useState(0);
   const current = slides[currentIndex];
-  const chapterVisuals = chapter.id === "chapter-04" ? chapter04Visuals : chapter.id === "chapter-03" ? chapter03Visuals : chapter.id === "chapter-02" ? chapter02Visuals : visuals;
+  const chapterVisuals = chapter.order >= 5 && chapter.order <= 11 ? chapter05To11Visuals : chapter.id === "chapter-04" ? chapter04Visuals : chapter.id === "chapter-03" ? chapter03Visuals : chapter.id === "chapter-02" ? chapter02Visuals : visuals;
   const visual = chapterVisuals[current.visual] ?? chapterVisuals[0];
 
   function goTo(index: number) {

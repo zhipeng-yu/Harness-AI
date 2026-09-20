@@ -4,6 +4,15 @@ import { chapter01 } from "@/content/chapters/chapter-01";
 import { chapter02 } from "@/content/chapters/chapter-02";
 import { chapter03 } from "@/content/chapters/chapter-03";
 import { chapter04 } from "@/content/chapters/chapter-04";
+import {
+  chapter05,
+  chapter06,
+  chapter07,
+  chapter08,
+  chapter09,
+  chapter10,
+  chapter11,
+} from "@/content/chapters/chapter-05-11";
 
 async function loadRegistry(environment: Record<string, string | undefined> = {}) {
   vi.resetModules();
@@ -79,7 +88,7 @@ describe("chapter content contract", () => {
     ).toThrow();
   });
 
-  it("exposes four published chapters and 14 awaiting-audio chapters by default", async () => {
+  it("exposes eleven published chapters and seven awaiting-audio chapters by default", async () => {
     const { getChapters } = await loadRegistry();
     const chapters = getChapters();
 
@@ -88,7 +97,16 @@ describe("chapter content contract", () => {
     expect(chapters[1]).toEqual(chapter02);
     expect(chapters[2]).toEqual(chapter03);
     expect(chapters[3]).toEqual(chapter04);
-    expect(chapters.slice(4).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
+    expect(chapters.slice(4, 11)).toEqual([
+      chapter05,
+      chapter06,
+      chapter07,
+      chapter08,
+      chapter09,
+      chapter10,
+      chapter11,
+    ]);
+    expect(chapters.slice(11).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
     expect(new Set(chapters.map((chapter) => chapter.id)).size).toBe(18);
     expect(new Set(chapters.map((chapter) => chapter.slug)).size).toBe(18);
     expect(chapters.map((chapter) => chapter.order)).toEqual([
@@ -119,6 +137,7 @@ describe("chapter content contract", () => {
     expect(chapters[1]).toEqual(chapter02);
     expect(chapters[2]).toEqual(chapter03);
     expect(chapters[3]).toEqual(chapter04);
-    expect(chapters.slice(4).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
+    expect(chapters.slice(4, 11).every((chapter) => chapter.status === "published")).toBe(true);
+    expect(chapters.slice(11).every((chapter) => chapter.status === "awaiting_audio")).toBe(true);
   });
 });

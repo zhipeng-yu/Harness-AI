@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480" role="img" aria-labelledby="title desc">
+  <title id="title">创造物与现实反馈回路</title>
+  <desc id="desc">假设形成最小创造物，进入现实后以反馈更新判断</desc>
+  <rect width="720" height="480" rx="40" fill="#f3f3f1"/>
+  <g fill="#fff" stroke="#232323" stroke-width="4">
+    <circle cx="180" cy="240" r="82"/><circle cx="540" cy="240" r="82"/><rect x="300" y="70" width="120" height="72" rx="18"/><rect x="300" y="338" width="120" height="72" rx="18"/>
+  </g>
+  <g stroke="#232323" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M239 181c68-72 173-72 242 0"/><path d="m468 165 13 16-21 7"/>
+    <path d="M481 299c-68 72-173 72-242 0"/><path d="m252 315-13-16 21-7"/>
+    <path d="M360 142v52"/><path d="m346 180 14 14 14-14"/><path d="M360 286v52"/><path d="m346 324 14 14 14-14"/>
+  </g>
+  <g font-family="Arial, sans-serif" font-size="22" fill="#232323" text-anchor="middle">
+    <text x="180" y="248">内部判断</text><text x="540" y="248">外部现实</text><text x="360" y="115">最小 Build</text><text x="360" y="383">反馈更新</text>
+  </g>
+</svg>
