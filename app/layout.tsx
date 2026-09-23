@@ -22,7 +22,6 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           <Link href="/">我的首页</Link>
           <Link href="/chapters">18章地图</Link>
           <Link href="/system">我的系统</Link>
-          <Link href="/diagnosis">教学诊断</Link>
         </nav>
         {children}
       </body>

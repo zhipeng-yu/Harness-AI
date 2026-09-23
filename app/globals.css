@@ -45,7 +45,7 @@ a:hover {
   color: var(--heading);
 }
 
-:where(a, button, textarea, input, select, summary):focus-visible {
+:where(a, button, textarea, input, summary):focus-visible {
   outline: 3px solid var(--control);
   outline-offset: 3px;
 }
@@ -614,8 +614,7 @@ label {
 }
 
 textarea,
-input,
-select {
+input {
   width: 100%;
   min-height: 7.5rem;
   padding: 0.85rem 0.95rem;
@@ -629,8 +628,7 @@ select {
 }
 
 textarea:hover,
-input:hover,
-select:hover {
+input:hover {
   border-color: var(--control);
 }
 
@@ -699,252 +697,6 @@ summary {
   margin: 0;
 }
 
-.diagnosis {
-  display: grid;
-  gap: 3rem;
-}
-
-.diagnosis-create {
-  padding: 1.25rem 1.5rem;
-  background: #ffffff;
-  border: 0;
-  border-radius: 20px;
-}
-
-.diagnosis-create summary {
-  font-size: 1.1rem;
-  font-weight: 500;
-}
-
-.diagnosis-create form {
-  max-width: var(--reading);
-  padding-top: 1rem;
-}
-
-.diagnosis input:not([type="checkbox"]):not([type="radio"]),
-.diagnosis select {
-  min-height: 3rem;
-}
-
-.diagnosis select {
-  width: 100%;
-  padding: 0.7rem 0.95rem;
-  color: var(--ink);
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  font: inherit;
-}
-
-.diagnosis-list,
-.diagnosis-completed {
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-.diagnosis-list__items {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.diagnosis-list__items button {
-  display: grid;
-  width: 100%;
-  min-height: 5rem;
-  margin: 0;
-  padding: 1rem 1.15rem;
-  justify-items: start;
-  text-align: left;
-  color: var(--ink);
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-}
-
-.diagnosis-list__items button[aria-pressed="true"] {
-  color: #ffffff;
-  background: var(--control);
-  border-color: var(--control);
-}
-
-.diagnosis-list__items small {
-  color: var(--muted);
-}
-
-.diagnosis-list__items button[aria-pressed="true"] small {
-  color: var(--surface-muted);
-}
-
-.diagnosis-editor,
-.diagnosis-summary {
-  padding: clamp(1.5rem, 4vw, 3rem);
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 8px 32px rgb(0 0 0 / 3%);
-}
-
-.diagnosis-editor__header,
-.diagnosis-summary header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.diagnosis-editor__header h2,
-.diagnosis-summary h3,
-.diagnosis-eyebrow {
-  margin: 0;
-}
-
-.diagnosis-eyebrow,
-.diagnosis-step__count,
-.diagnosis-save {
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.diagnosis-original-fact {
-  margin-block: 1.5rem;
-  padding: 1rem 1.15rem;
-  background: var(--paper);
-  border-radius: 14px;
-}
-
-.diagnosis-original-fact p {
-  margin: 0.3rem 0 0;
-}
-
-.diagnosis-steps {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  margin: 2rem 0;
-  padding: 0;
-  gap: 0.5rem;
-  list-style: none;
-}
-
-.diagnosis-steps li {
-  display: grid;
-  gap: 0.3rem;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.diagnosis-steps span {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-}
-
-.diagnosis-steps [aria-current="step"] {
-  color: var(--heading);
-  font-weight: 500;
-}
-
-.diagnosis-steps [aria-current="step"] span {
-  color: #ffffff;
-  background: var(--control);
-  border-color: var(--control);
-}
-
-.diagnosis-step {
-  max-width: var(--reading);
-}
-
-.diagnosis-step > p:not([role="alert"]) {
-  color: var(--muted);
-}
-
-.diagnosis-field {
-  display: grid;
-}
-
-.diagnosis-checklist,
-.diagnosis-choices {
-  display: grid;
-  margin: 1rem 0;
-  padding: 1rem 1.15rem;
-  gap: 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-}
-
-.diagnosis-checklist legend,
-.diagnosis-choices legend {
-  padding-inline: 0.35rem;
-  color: var(--heading);
-  font-weight: 500;
-}
-
-.diagnosis-checklist label,
-.diagnosis-choices label {
-  display: flex;
-  min-height: 2.75rem;
-  margin: 0;
-  align-items: center;
-  gap: 0.65rem;
-  font-weight: 400;
-  cursor: pointer;
-}
-
-.diagnosis-checklist input,
-.diagnosis-choices input {
-  width: 1.15rem;
-  min-height: 1.15rem;
-  margin: 0;
-  flex: 0 0 auto;
-}
-
-.diagnosis-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.button-secondary {
-  color: var(--heading);
-  background: transparent;
-  border-color: var(--line);
-}
-
-.diagnosis-summary {
-  margin-block: 1rem;
-}
-
-.diagnosis-summary header > span {
-  padding: 0.2rem 0.65rem;
-  color: var(--heading);
-  background: var(--surface-muted);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.diagnosis-summary dl {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin: 2rem 0 0;
-  gap: 1.25rem;
-}
-
-.diagnosis-summary dt {
-  margin-bottom: 0.35rem;
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-
-.diagnosis-summary dd {
-  margin: 0;
-}
-
-.diagnosis-summary dd p {
-  margin-bottom: 0.6rem;
-}
-
 @media (max-width: 980px) {
   .chapter-workspace {
     grid-template-columns: 1fr;
@@ -988,11 +740,6 @@ summary {
   .system-module > dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .diagnosis-list__items,
-  .diagnosis-summary dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 680px) {
@@ -1019,17 +766,6 @@ summary {
   .open-loop dl,
   .system-module > dl {
     grid-template-columns: 1fr;
-  }
-
-  .diagnosis-list__items,
-  .diagnosis-summary dl {
-    grid-template-columns: 1fr;
-  }
-
-  .diagnosis-steps {
-    grid-template-columns: repeat(6, 5.5rem);
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
   }
 
   .next-action h2 {
