@@ -52,17 +52,14 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
-  it.each([chapter01, chapter02, chapter03, chapter04, chapter05, chapter06, chapter07, chapter08, chapter09, chapter10, chapter11])("keeps every paragraph, concept, scenario and misconception in $id", (chapter) => {
+  it.each([chapter01, chapter02, chapter03, chapter04, chapter05, chapter06, chapter07, chapter08, chapter09, chapter10, chapter11])("keeps every explanation paragraph in $id", (chapter) => {
     const slides = buildChapterSlides(chapter);
     const displayed = slides.flatMap(slide => [slide.lead, ...(slide.items ?? []).flatMap(item => [item.title, item.summary])]);
     for (const text of [
-      ...chapter.coreStructure.map(item => item.body),
       ...chapter.explanation.map(item => item.body),
-      ...chapter.concepts.map(item => item.meaning),
-      ...chapter.scenarios,
-      ...chapter.misconceptions,
     ]) expect(displayed).toContain(text);
     expect(slides.filter(slide => slide.eyebrow === "深入理解")).toHaveLength(chapter.explanation.length);
+    if (chapter.order >= 3) expect(slides).toHaveLength(chapter.explanation.length + 2);
   });
 
   it.each([chapter01, chapter04])("jumps to a complete article and enters practice from the last page in $id", (chapter) => {
@@ -94,17 +91,16 @@ describe("ChapterWorkspace", () => {
     expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-02/");
   });
 
-  it("publishes the complete third chapter with its own visuals and three-day practice", () => {
+  it("reads the third chapter as one narrative with its own visuals and three-day practice", () => {
     expect(chapterSchema.safeParse(chapter03).success).toBe(true);
     expect(getChapterBySlug("chapter-03")).toEqual(chapter03);
     const slides = buildChapterSlides(chapter03);
-    expect(slides).toHaveLength(51);
+    expect(slides).toHaveLength(chapter03.explanation.length + 2);
     const enterPractice = vi.fn();
     render(<ChapterDeck chapter={chapter03} onEnterPractice={enterPractice} />);
     const directory = screen.getByRole("combobox", { name: "阅读目录" });
-    const scenario = slides.findIndex(slide => slide.eyebrow === "落到日常");
-    fireEvent.change(directory, { target: { value: String(scenario) } });
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把分工与判断用在真实任务中");
+    fireEvent.change(directory, { target: { value: "1" } });
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(chapter03.explanation[0].heading);
     expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-03/");
     fireEvent.change(directory, { target: { value: String(slides.length - 1) } });
     expect(screen.getByText(chapter03.actionPrompt.question)).toBeInTheDocument();
@@ -113,11 +109,11 @@ describe("ChapterWorkspace", () => {
     expect(enterPractice).toHaveBeenCalledOnce();
   });
 
-  it("publishes all 54 pages of chapter 04 with its own visuals and workflow practice", () => {
+  it("reads chapter 04 as one narrative with its own visuals and workflow practice", () => {
     expect(chapterSchema.safeParse(chapter04).success).toBe(true);
     expect(getChapterBySlug("chapter-04")).toEqual(chapter04);
     const slides = buildChapterSlides(chapter04);
-    expect(slides).toHaveLength(54);
+    expect(slides).toHaveLength(chapter04.explanation.length + 2);
     const enterPractice = vi.fn();
     render(<ChapterDeck chapter={chapter04} onEnterPractice={enterPractice} />);
     const directory = screen.getByRole("combobox", { name: "阅读目录" });
@@ -126,9 +122,6 @@ describe("ChapterWorkspace", () => {
       fireEvent.change(directory, { target: { value: String(index) } });
       expect(images[slide.visual]).toBeDefined();
       expect(screen.getByRole("img")).toHaveAttribute("src", `/illustrations/chapter-04/${images[slide.visual]}`);
-      if (slide.eyebrow === "落到日常") {
-        expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把流程重构用在真实任务中");
-      }
     });
     expect(new Set(slides.map(slide => slide.visual)).size).toBe(3);
     for (const paragraph of chapter04.actionPrompt.question.split("\n\n")) {
@@ -139,11 +132,11 @@ describe("ChapterWorkspace", () => {
     expect(enterPractice).toHaveBeenCalledOnce();
   });
 
-  it.each([chapter05, chapter06, chapter07, chapter08, chapter09, chapter10, chapter11])("publishes $id with reviewed content and shared method visuals", (chapter) => {
+  it.each([chapter05, chapter06, chapter07, chapter08, chapter09, chapter10, chapter11])("reads $id at its own length with shared method visuals", (chapter) => {
     expect(chapterSchema.safeParse(chapter).success).toBe(true);
     expect(getChapterBySlug(chapter.slug)).toEqual(chapter);
     const slides = buildChapterSlides(chapter);
-    expect(slides.length).toBeGreaterThan(15);
+    expect(slides).toHaveLength(chapter.explanation.length + 2);
     expect(new Set(slides.map((slide) => slide.visual))).toEqual(new Set([0, 1, 2]));
     render(<ChapterDeck chapter={chapter} onEnterPractice={vi.fn()} />);
     expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-05-11/");

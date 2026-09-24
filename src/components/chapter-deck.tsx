@@ -92,6 +92,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
   const isChapter03 = chapter.id === "chapter-03";
   const isChapter04 = chapter.id === "chapter-04";
   const isChapter05To11 = chapter.order >= 5 && chapter.order <= 11;
+  const narrativeOnly = chapter.order >= 3 && chapter.order <= 11;
   const coreSlides = chapter.coreStructure.map((item, index) => ({
     eyebrow: `阅读路线 · ${String(index + 1).padStart(2, "0")}`,
     title: item.title,
@@ -117,14 +118,25 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
       visual: isChapter05To11 ? index % 3 : isChapter04 ? ([0, 0, 2, 1][index] ?? 0) : isChapter03 ? (index === 2 ? 2 : index) : isChapter02 ? (index === 0 ? 1 : 2) : conceptVisuals[index] ?? 0,
     }));
 
-  return [
-    {
+  const opening = {
       eyebrow: `第 ${chapter.order} 章`,
       title: chapter.title,
       lead: chapter.problem,
       items: [{ title: "一句话理解", summary: chapter.oneSentence }],
       visual: 0,
-    },
+    };
+  const closing = {
+      eyebrow: "从理解到行动",
+      title: "让新能力与现实发生接触",
+      lead: chapter.actionPrompt.question,
+      visual: isChapter05To11 ? 1 : isChapter04 ? 1 : isChapter03 ? 2 : isChapter02 ? 3 : 7,
+      closing: true,
+    };
+
+  if (narrativeOnly) return [opening, ...explanationSlides, closing];
+
+  return [
+    opening,
     ...coreSlides,
     ...explanationSlides,
     ...conceptSlides,
@@ -144,13 +156,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
       })),
       visual: isChapter05To11 ? 2 : 1,
     })),
-    {
-      eyebrow: "从理解到行动",
-      title: "让新能力与现实发生接触",
-      lead: chapter.actionPrompt.question,
-      visual: isChapter05To11 ? 1 : isChapter04 ? 1 : isChapter03 ? 2 : isChapter02 ? 3 : 7,
-      closing: true,
-    },
+    closing,
   ];
 }
 
