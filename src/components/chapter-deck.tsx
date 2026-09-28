@@ -79,7 +79,7 @@ const chapter05To11Visuals = [
   { src: "/illustrations/chapter-05-11/reality-loop.svg", alt: "方法示意：内部判断形成最小创造物，通过现实反馈完成更新" },
   { src: "/illustrations/chapter-05-11/system-layers.svg", alt: "方法示意：人的意图与治理连接工作流、Agent、脚本和数据" },
 ] as const;
-const chapter04ExplanationVisuals = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2, 2, 1, 0, 0, 2, 1, 0, 0, 1, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 0, 1] as const;
+const chapter04ExplanationVisuals = [0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 1, 1] as const;
 
 function inGroups<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
   return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
@@ -104,7 +104,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
     eyebrow: "深入理解",
     title: item.heading,
     lead: item.body,
-    visual: isChapter05To11 ? index % 3 : isChapter04 ? chapter04ExplanationVisuals[index] ?? 0 : isChapter03 ? (index >= 35 ? 2 : index >= 18 && index <= 25 ? 1 : 0) : isChapter02 ? ([0, 0, 1, 1, 1, 3, 0, 2, 2, 2, 2, 3, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
+    visual: isChapter05To11 ? index % 3 : isChapter04 ? chapter04ExplanationVisuals[index] ?? 0 : isChapter03 ? (index === 15 ? 2 : index >= 8 && index <= 12 ? 1 : 0) : isChapter02 ? ([0, 0, 1, 1, 1, 3, 0, 2, 2, 2, 2, 3, 3, 3][index] ?? 0) : explanationVisuals[index] ?? 0,
   }));
 
   const conceptSlides = inGroups(chapter.concepts, 3).map((group, index) => ({
