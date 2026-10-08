@@ -20,7 +20,7 @@ function formatTime(value: string) {
 export function ArtifactVersionHistory({
   versions,
   reviews,
-  fieldLabels = ["问题", "原则", "规则", "成功标准"],
+  fieldLabels = ["实践目标", "执行计划与成功标准", "规则", "成功标准"],
 }: ArtifactVersionHistoryProps) {
   const chronologicalVersions = [...versions].sort(
     (left, right) =>
@@ -53,20 +53,20 @@ export function ArtifactVersionHistory({
                 <dt>{fieldLabels[1]}</dt>
                 <dd>{version.principles}</dd>
               </div>
-              <div>
+              {version.rules ? <div>
                 <dt>{fieldLabels[2]}</dt>
                 <dd>{version.rules}</dd>
-              </div>
-              <div>
+              </div> : null}
+              {version.successCriteria ? <div>
                 <dt>{fieldLabels[3]}</dt>
                 <dd>{version.successCriteria}</dd>
-              </div>
+              </div> : null}
               <div>
                 <dt>修订说明</dt>
                 <dd>{version.revisionNote || "初始版本"}</dd>
               </div>
             </dl>
-            <h4>复盘</h4>
+            <h4>实践后：结果与复盘</h4>
             {linkedReviews.length === 0 ? (
               <p>暂无复盘</p>
             ) : (

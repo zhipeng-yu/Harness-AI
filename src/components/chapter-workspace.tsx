@@ -8,8 +8,7 @@ import type {
   ArtifactVersion,
 } from "@/src/features/artifacts/repository";
 import type { LearningStage } from "@/src/types/learning";
-import { ActionPlanForm } from "./action-plan-form";
-import { ArtifactEditor, isArtifactPayload } from "./artifact-editor";
+import { ArtifactEditor, artifactPlanLabels, isArtifactPayload } from "./artifact-editor";
 import { ArtifactReviewForm } from "./artifact-review-form";
 import { ArtifactVersionHistory } from "./artifact-version-history";
 import { AutosaveField } from "./autosave-field";
@@ -44,12 +43,12 @@ function ArtifactVersionContent({
   ];
   return (
     <dl className="artifact-content">
-      {fields.map((field, index) => (
+      {fields.map((field, index) => values[index] ? (
         <div key={field.id}>
-          <dt>{field.label}</dt>
+          <dt>{index < 2 ? artifactPlanLabels[index] : field.label}</dt>
           <dd>{values[index]}</dd>
         </div>
-      ))}
+      ) : null)}
     </dl>
   );
 }
@@ -64,7 +63,6 @@ export function ChapterWorkspace({
   const [learningStage, setLearningStage] = useState(initialLearningStage);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const [savedActionPlan, setSavedActionPlan] = useState(actionPlan);
   const [currentArtifact, setCurrentArtifact] = useState(artifact);
   const [artifactSaving, setArtifactSaving] = useState(false);
   const [artifactError, setArtifactError] = useState(false);
@@ -161,26 +159,26 @@ export function ChapterWorkspace({
         </section>
 
         <section>
-          <h2>行动设计</h2>
-          <ActionPlanForm
-            chapterId={chapter.id}
-            actionPrompt={chapter.actionPrompt}
-            initialValue={savedActionPlan}
-            onSaved={setSavedActionPlan}
-          />
-        </section>
-
-        <section>
           <h2>实践成果卡（Artifact）</h2>
           <p>
-            它把本章方法变成一轮可检查的实践。草稿可以修改；点击开始实践后，
-            当前版本会锁定，等真实结果回来再复盘并生成下一版。
+            实践前填写目标和执行计划，开始实践后锁定本版计划。
+            实践结束后再填写结果与复盘，并据此调整下一版。
           </p>
+          {actionPlan ? (
+            <details>
+              <summary>之前保存的行动设计</summary>
+              <p>现实问题：{actionPlan.problem}</p>
+              <p>行动：{actionPlan.action}</p>
+              <p>成功标准：{actionPlan.successCriteria}</p>
+            </details>
+          ) : null}
           {!currentArtifact ? (
             <ArtifactEditor
               chapterId={chapter.id}
               title={chapter.artifactTemplate.title}
               fields={chapter.artifactTemplate.fields}
+              initialPlan={actionPlan}
+              actionPrompt={chapter.actionPrompt}
               onSaved={setCurrentArtifact}
             />
           ) : currentVersion ? (
@@ -197,17 +195,21 @@ export function ChapterWorkspace({
                   fields={chapter.artifactTemplate.fields}
                   artifactId={currentArtifact.id}
                   version={currentVersion}
+                  actionPrompt={chapter.actionPrompt}
                   onSaved={setCurrentArtifact}
                 />
               ) : (
-                <ArtifactVersionContent
-                  fields={chapter.artifactTemplate.fields}
-                  version={currentVersion}
-                />
+                <div>
+                  <h4>实践前：本版计划</h4>
+                  <ArtifactVersionContent
+                    fields={chapter.artifactTemplate.fields}
+                    version={currentVersion}
+                  />
+                </div>
               )}
               {currentArtifact.status === "draft" ? (
                 <div>
-                  <p>修改后请先保存草稿，再开始实践。</p>
+                  <p>修改后请先保存实践计划，再开始实践。</p>
                   <button
                     type="button"
                     disabled={artifactSaving}
@@ -223,7 +225,7 @@ export function ChapterWorkspace({
                   disabled={artifactSaving}
                   onClick={() => void updateArtifactState("mark_review_ready")}
                 >
-                  标记为可以复盘
+                  实践结束，填写结果与复盘
                 </button>
               ) : null}
               {currentArtifact.status === "review_ready" ? (
@@ -256,8 +258,8 @@ export function ChapterWorkspace({
                   versions={currentArtifact.versions}
                   reviews={currentArtifact.reviews}
                   fieldLabels={[
-                    chapter.artifactTemplate.fields[0].label,
-                    chapter.artifactTemplate.fields[1].label,
+                    artifactPlanLabels[0],
+                    artifactPlanLabels[1],
                     chapter.artifactTemplate.fields[2].label,
                     chapter.artifactTemplate.fields[3].label,
                   ]}
@@ -284,10 +286,15 @@ export function ChapterWorkspace({
 
       <aside className="chapter-workspace__summary" aria-label="行动与产物摘要">
         <h2>行动摘要</h2>
-        {savedActionPlan ? (
+        {currentVersion ? (
           <div>
-            <p>{savedActionPlan.action}</p>
-            <p>成功标准：{savedActionPlan.successCriteria}</p>
+            <p>{currentVersion.problem}</p>
+            <p>{currentVersion.principles}</p>
+          </div>
+        ) : actionPlan ? (
+          <div>
+            <p>{actionPlan.action}</p>
+            <p>成功标准：{actionPlan.successCriteria}</p>
           </div>
         ) : (
           <p>尚未制定行动</p>

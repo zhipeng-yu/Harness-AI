@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
 import { ActionPlanForm } from "@/src/components/action-plan-form";
-import { ArtifactEditor } from "@/src/components/artifact-editor";
+import { ArtifactEditor, artifactPlanLabels } from "@/src/components/artifact-editor";
 import { ArtifactReviewForm } from "@/src/components/artifact-review-form";
 import { ChapterWorkspace } from "@/src/components/chapter-workspace";
 import type { Artifact } from "@/src/features/artifacts/repository";
@@ -98,7 +98,7 @@ describe("fixed action and Artifact forms", () => {
     });
   });
 
-  it("creates an Artifact from exactly four version text fields", async () => {
+  it("creates a practice plan without asking for results in advance", async () => {
     const saved = artifactFixture();
     vi.stubGlobal(
       "fetch",
@@ -114,24 +114,17 @@ describe("fixed action and Artifact forms", () => {
       />,
     );
 
-    expect(screen.getAllByRole("textbox")).toHaveLength(4);
+    expect(screen.getAllByRole("textbox")).toHaveLength(2);
     expect(container.querySelector('input[type="file"], input[type="url"]')).toBeNull();
     fireEvent.change(
-      screen.getByRole("textbox", { name: "要解决的现实问题" }),
+      screen.getByRole("textbox", { name: artifactPlanLabels[0] }),
       { target: { value: "Problem" } },
     );
     fireEvent.change(
-      screen.getByRole("textbox", { name: "从课程采用的核心原则" }),
+      screen.getByRole("textbox", { name: artifactPlanLabels[1] }),
       { target: { value: "Principles" } },
     );
-    fireEvent.change(screen.getByRole("textbox", { name: "运行规则" }), {
-      target: { value: "Rules" },
-    });
-    fireEvent.change(
-      screen.getByRole("textbox", { name: "可观察的成功标准" }),
-      { target: { value: "Success" } },
-    );
-    fireEvent.click(screen.getByRole("button", { name: "创建实践成果卡" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存实践计划" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
     expect(fetch).toHaveBeenCalledWith("/api/artifacts", {
@@ -142,8 +135,8 @@ describe("fixed action and Artifact forms", () => {
         title: "Focus system",
         problem: "Problem",
         principles: "Principles",
-        rules: "Rules",
-        successCriteria: "Success",
+        rules: "",
+        successCriteria: "",
       }),
     });
   });
@@ -169,13 +162,16 @@ describe("fixed action and Artifact forms", () => {
     );
 
     expect(
-      screen.getByRole("textbox", { name: "要解决的现实问题" }),
+      screen.getByRole("textbox", { name: artifactPlanLabels[0] }),
     ).toHaveValue("Server problem");
     fireEvent.change(
-      screen.getByRole("textbox", { name: "要解决的现实问题" }),
+      screen.getByRole("textbox", { name: artifactPlanLabels[0] }),
       { target: { value: "Updated problem" } },
     );
-    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    expect(screen.getAllByRole("textbox")).toHaveLength(2);
+    expect(screen.getByText("Server rules")).toBeInTheDocument();
+    expect(screen.getByText("Server success")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存实践计划" }));
 
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
     expect(fetch).toHaveBeenCalledWith("/api/artifacts/artifact-01", {
@@ -289,5 +285,55 @@ describe("fixed action and Artifact forms", () => {
         screen.getByRole("textbox", { name: publishedChapterFixture.reviewPrompts[0].question }),
       ).toBeInTheDocument(),
     );
+  });
+
+  it("prefills the single practice plan from an existing action design", () => {
+    const actionPlan = {
+      id: "action-01", ownerId: "owner-local", chapterId: "chapter-01",
+      problem: "Existing goal", action: "Existing action", successCriteria: "Existing standard",
+      createdAt: artifactVersion.createdAt, updatedAt: artifactVersion.createdAt,
+    };
+    render(<ChapterWorkspace chapter={publishedChapterFixture}
+      learningStage="learned" savedResponses={{}} actionPlan={actionPlan} artifact={null} />);
+
+    expect(screen.getByRole("textbox", { name: artifactPlanLabels[0] })).toHaveValue("Existing goal");
+    expect(screen.getByRole("textbox", { name: artifactPlanLabels[1] })).toHaveValue(
+      "Existing action\n\n成功标准：Existing standard",
+    );
+    expect(screen.queryByRole("button", { name: "保存行动计划" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "保存实践计划" })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "实践后：记录结果与复盘" })).not.toBeInTheDocument();
+  });
+
+  it("shows the review form only after practice ends and retains the submitted review", async () => {
+    const review = {
+      id: "review-01", artifactId: "artifact-01", artifactVersionId: artifactVersion.id,
+      actualResult: "Finished three days", effective: "A useful habit", nextChange: "Simplify next time",
+      createdAt: artifactVersion.createdAt,
+    };
+    const request = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => artifactFixture({ status: "review_ready" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => artifactFixture({ status: "reviewed", reviews: [review] }) });
+    vi.stubGlobal("fetch", request);
+    render(<ChapterWorkspace chapter={publishedChapterFixture}
+      learningStage="learned" savedResponses={{}} actionPlan={null}
+      artifact={artifactFixture({ status: "in_practice" })} />);
+
+    expect(screen.queryByRole("textbox", { name: publishedChapterFixture.reviewPrompts[0].question })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: artifactPlanLabels[0] })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "实践结束，填写结果与复盘" }));
+    await screen.findByRole("heading", { name: "实践后：记录结果与复盘" });
+    const values = [review.actualResult, review.effective, review.nextChange];
+    publishedChapterFixture.reviewPrompts.forEach((prompt, index) => {
+      fireEvent.change(screen.getByRole("textbox", { name: prompt.question }), { target: { value: values[index] } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "完成复盘" }));
+    await screen.findByText("实际结果：Finished three days");
+    expect(screen.getByText("有效做法：A useful habit")).toBeInTheDocument();
+    expect(screen.getByText("下一步变更：Simplify next time")).toBeInTheDocument();
+    expect(request).toHaveBeenLastCalledWith("/api/artifacts/artifact-01", expect.objectContaining({
+      body: JSON.stringify({ event: "submit_review", actualResult: review.actualResult,
+        effective: review.effective, nextChange: review.nextChange, createNextVersion: false }),
+    }));
   });
 });

@@ -17,8 +17,8 @@ const artifactTransitionInput = z.discriminatedUnion("event", [
     event: z.literal("save_draft"),
     problem: z.string().trim().min(1),
     principles: z.string().trim().min(1),
-    rules: z.string().trim().min(1),
-    successCriteria: z.string().trim().min(1),
+    rules: z.string(),
+    successCriteria: z.string(),
   }),
   z.object({
     event: z.literal("submit_review"),

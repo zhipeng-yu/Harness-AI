@@ -43,6 +43,8 @@ export function ArtifactReviewForm({ artifactId, prompts, onSaved }: ArtifactRev
 
   return (
     <form onSubmit={(event) => event.preventDefault()}>
+      <h4>实践后：记录结果与复盘</h4>
+      <p>实践结束后一次填写实际经过、收获和下一轮调整。</p>
       <label htmlFor={prompts[0].id}>{prompts[0].question}</label>
       <textarea id={prompts[0].id} required value={actualResult} onChange={(event) => setActualResult(event.target.value)} />
       <label htmlFor={prompts[1].id}>{prompts[1].question}</label>

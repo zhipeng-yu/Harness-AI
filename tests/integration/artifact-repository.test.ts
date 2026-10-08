@@ -213,7 +213,7 @@ describe("Artifact repository", () => {
     });
   });
 
-  it("copies all four immutable fields into the next draft version", () => {
+  it("keeps legacy results in history and copies only the plan into the next draft", () => {
     const created = createArtifact();
     moveToReviewReady(created.id);
 
@@ -247,8 +247,8 @@ describe("Artifact repository", () => {
         version: 2,
         problem: firstVersion.problem,
         principles: firstVersion.principles,
-        rules: firstVersion.rules,
-        successCriteria: firstVersion.successCriteria,
+        rules: "",
+        successCriteria: "",
         revisionNote: "Shorten the focus window",
       },
     ]);
@@ -279,8 +279,8 @@ describe("Artifact repository", () => {
       version: 2,
       problem: firstVersion.problem,
       principles: firstVersion.principles,
-      rules: firstVersion.rules,
-      successCriteria: firstVersion.successCriteria,
+      rules: "",
+      successCriteria: "",
       revisionNote: "Shorten the focus window",
     });
   });

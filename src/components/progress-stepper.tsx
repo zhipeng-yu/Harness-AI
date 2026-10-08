@@ -4,9 +4,8 @@ const stages = [
   "进入本章",
   "理解系统",
   "照见自己",
-  "行动设计",
-  "创建 Artifact",
-  "实践复盘",
+  "实践前计划",
+  "实践后复盘",
 ] as const;
 
 export function ProgressStepper({

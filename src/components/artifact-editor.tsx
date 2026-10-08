@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ChapterDefinition } from "@/content/schema";
+import type { ActionPlan } from "@/src/features/actions/repository";
 import type {
   Artifact,
   ArtifactVersion,
@@ -16,8 +17,12 @@ type ArtifactEditorProps = Readonly<{
   fields: PublishedChapter["artifactTemplate"]["fields"];
   artifactId?: string;
   version?: ArtifactVersion;
+  initialPlan?: ActionPlan | null;
+  actionPrompt?: PublishedChapter["actionPrompt"];
   onSaved: (artifact: Artifact) => void;
 }>;
+
+export const artifactPlanLabels = ["实践目标", "执行计划与成功标准"] as const;
 
 const artifactStatuses: ArtifactStatus[] = ["draft", "in_practice", "review_ready", "reviewed", "archived"];
 
@@ -42,14 +47,18 @@ export function ArtifactEditor({
   fields,
   artifactId,
   version,
+  initialPlan,
+  actionPrompt,
   onSaved,
 }: ArtifactEditorProps) {
-  const [problem, setProblem] = useState(version?.problem ?? "");
-  const [principles, setPrinciples] = useState(version?.principles ?? "");
-  const [rules, setRules] = useState(version?.rules ?? "");
-  const [successCriteria, setSuccessCriteria] = useState(
-    version?.successCriteria ?? "",
+  const [problem, setProblem] = useState(version?.problem ?? initialPlan?.problem ?? "");
+  const [principles, setPrinciples] = useState(
+    version?.principles ?? (initialPlan
+      ? `${initialPlan.action}\n\n成功标准：${initialPlan.successCriteria}`
+      : ""),
   );
+  const rules = version?.rules ?? "";
+  const successCriteria = version?.successCriteria ?? "";
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
@@ -96,18 +105,27 @@ export function ArtifactEditor({
 
   return (
     <form onSubmit={save}>
+      <h4>实践前：制定计划</h4>
       <p>{artifactId ? `编辑 v${version?.version ?? ""} 草稿` : title}</p>
       {version?.revisionNote ? <p>本版调整：{version.revisionNote}</p> : null}
-      <label htmlFor={fields[0].id}>{fields[0].label}</label>
-      <textarea id={fields[0].id} required value={problem} onChange={(event) => setProblem(event.target.value)} />
-      <label htmlFor={fields[1].id}>{fields[1].label}</label>
-      <textarea id={fields[1].id} required value={principles} onChange={(event) => setPrinciples(event.target.value)} />
-      <label htmlFor={fields[2].id}>{fields[2].label}</label>
-      <textarea id={fields[2].id} required value={rules} onChange={(event) => setRules(event.target.value)} />
-      <label htmlFor={fields[3].id}>{fields[3].label}</label>
-      <textarea id={fields[3].id} required value={successCriteria} onChange={(event) => setSuccessCriteria(event.target.value)} />
+      {actionPrompt ? <p id={actionPrompt.id}>{actionPrompt.question}</p> : null}
+      <label htmlFor={fields[0].id}>{artifactPlanLabels[0]}</label>
+      <p id={`${fields[0].id}-help`}>想改变什么、为什么值得做？本章提示：{fields[0].label}</p>
+      <textarea id={fields[0].id} aria-describedby={`${fields[0].id}-help`} required value={problem} onChange={(event) => setProblem(event.target.value)} />
+      <label htmlFor={fields[1].id}>{artifactPlanLabels[1]}</label>
+      <p id={`${fields[1].id}-help`}>准备怎样做、何时做，什么结果算完成？本章提示：{fields[1].label}</p>
+      <textarea id={fields[1].id} aria-describedby={`${fields[1].id}-help`} required value={principles} onChange={(event) => setPrinciples(event.target.value)} />
+      {rules || successCriteria ? (
+        <details>
+          <summary>之前填写的补充内容</summary>
+          <dl>
+            {rules ? <div><dt>{fields[2].label}</dt><dd>{rules}</dd></div> : null}
+            {successCriteria ? <div><dt>{fields[3].label}</dt><dd>{successCriteria}</dd></div> : null}
+          </dl>
+        </details>
+      ) : null}
       <button type="submit" disabled={saving}>
-        {saving ? "保存中…" : artifactId ? "保存草稿" : "创建实践成果卡"}
+        {saving ? "保存中…" : "保存实践计划"}
       </button>
       {saveError ? <p role="alert">实践成果卡保存失败，请重试。</p> : null}
     </form>

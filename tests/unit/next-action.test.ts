@@ -57,6 +57,16 @@ it("recommends the first review-ready Artifact after chapter work", () => {
   });
 });
 
+it("recognizes the combined Artifact plan without a separate action plan", () => {
+  expect(recommendNextAction({
+    publishedChapterIds: ["chapter-01"],
+    progress: [{ chapterId: "chapter-01", learningStage: "learned" }],
+    actionChapterIds: [],
+    artifactChapterIds: ["chapter-01"],
+    reviewReadyArtifactIds: ["artifact-01"],
+  })).toEqual({ kind: "review_artifact", artifactId: "artifact-01" });
+});
+
 it("recommends the first published chapter with no progress", () => {
   const input = {
     publishedChapterIds: ["chapter-01", "chapter-03"],

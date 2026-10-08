@@ -18,6 +18,7 @@ import { getChapterBySlug } from "@/content/chapters/registry";
 import { publishedChapterFixture } from "@/content/fixtures/published-chapter";
 import { buildChapterSlides, ChapterDeck } from "@/src/components/chapter-deck";
 import { ChapterWorkspace } from "@/src/components/chapter-workspace";
+import { artifactPlanLabels } from "@/src/components/artifact-editor";
 
 const progressResponse = {
   ok: true,
@@ -36,7 +37,7 @@ describe("ChapterWorkspace", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the six stages and the chapter's real problem", () => {
+  it("shows the five stages and the chapter's real problem", () => {
     render(
       <ChapterWorkspace
         chapter={publishedChapterFixture}
@@ -48,7 +49,7 @@ describe("ChapterWorkspace", () => {
     );
 
     expect(screen.getByRole("navigation", { name: "章节学习阶段" }).querySelectorAll("li"))
-      .toHaveLength(6);
+      .toHaveLength(5);
     expect(screen.getByText(publishedChapterFixture.problem)).toBeInTheDocument();
   });
 
@@ -196,8 +197,11 @@ describe("ChapterWorkspace", () => {
       "id",
       publishedChapterFixture.actionPrompt.id,
     );
-    for (const field of publishedChapterFixture.artifactTemplate.fields) {
-      expect(document.getElementById(field.id)).toHaveAccessibleName(field.label);
+    publishedChapterFixture.artifactTemplate.fields.slice(0, 2).forEach((field, index) => {
+      expect(document.getElementById(field.id)).toHaveAccessibleName(artifactPlanLabels[index]);
+    });
+    for (const field of publishedChapterFixture.artifactTemplate.fields.slice(2)) {
+      expect(document.getElementById(field.id)).toBeNull();
     }
   });
 

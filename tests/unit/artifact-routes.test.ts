@@ -124,7 +124,7 @@ describe("action-plan and Artifact route validation", () => {
     const invalid = await postArtifact(
       jsonRequest("http://localhost/api/artifacts", "POST", {
         ...artifactBody,
-        rules: "",
+        problem: "",
       }),
     );
     const unpublished = await postArtifact(
@@ -157,6 +157,39 @@ describe("action-plan and Artifact route validation", () => {
 });
 
 describe("action-plan and Artifact route persistence", () => {
+  it("accepts a pre-practice plan with no results and saves the results only after practice", async () => {
+    const createdResponse = await postArtifact(jsonRequest("http://localhost/api/artifacts", "POST", {
+      chapterId: "chapter-01", title: "Three-day plan",
+      problem: "A habit to change", principles: "Try once each day; complete three attempts",
+    }));
+    expect(createdResponse.status).toBe(201);
+    const created = await createdResponse.json();
+    expect(created.versions[0]).toMatchObject({ rules: "", successCriteria: "" });
+    const saved = await patchRequest(created.id, {
+      event: "save_draft", problem: "A clearer goal", principles: "Try once each day",
+      rules: "", successCriteria: "",
+    });
+    expect(saved.status).toBe(200);
+    const reviewBody = {
+      event: "submit_review", actualResult: "Three attempts completed", effective: "A clear trigger",
+      nextChange: "Use an earlier trigger", createNextVersion: true,
+    };
+    expect((await patchRequest(created.id, reviewBody)).status).toBe(409);
+    await patchRequest(created.id, { event: "start_practice" });
+    expect((await patchRequest(created.id, reviewBody)).status).toBe(409);
+    await patchRequest(created.id, { event: "mark_review_ready" });
+    const reviewed = await patchRequest(created.id, reviewBody);
+    expect(reviewed.status).toBe(200);
+    const result = await reviewed.json();
+    expect(result.reviews).toEqual([expect.objectContaining({
+      artifactVersionId: created.versions[0].id, actualResult: reviewBody.actualResult,
+    })]);
+    expect(result.versions[1]).toMatchObject({
+      problem: "A clearer goal", principles: "Try once each day", rules: "", successCriteria: "",
+      revisionNote: reviewBody.nextChange,
+    });
+  });
+
   it("upserts the action plan for the fixed local owner", async () => {
     const response = await putActionPlan(
       jsonRequest("http://localhost/api/action-plans", "PUT", {

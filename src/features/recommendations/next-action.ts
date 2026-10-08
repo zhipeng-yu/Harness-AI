@@ -27,7 +27,7 @@ export function recommendNextAction(
   }
 
   for (const chapterId of input.publishedChapterIds) {
-    if (progress.get(chapterId) === "learned" && !actions.has(chapterId)) {
+    if (progress.get(chapterId) === "learned" && !actions.has(chapterId) && !artifacts.has(chapterId)) {
       return { kind: "plan_action", chapterId };
     }
   }

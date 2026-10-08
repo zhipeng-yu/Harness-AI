@@ -10,8 +10,8 @@ const artifactInput = z.object({
   title: z.string().trim().min(1),
   problem: z.string().trim().min(1),
   principles: z.string().trim().min(1),
-  rules: z.string().trim().min(1),
-  successCriteria: z.string().trim().min(1),
+  rules: z.string().default(""),
+  successCriteria: z.string().default(""),
 });
 
 export async function POST(request: Request) {

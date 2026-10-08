@@ -182,8 +182,8 @@ export function artifactRepository(db: DatabaseSync) {
       id, artifact_id, version, problem, principles, rules,
       success_criteria, revision_note, created_at
     )
-    SELECT ?, artifact_id, ?, problem, principles, rules,
-      success_criteria, ?, ?
+    SELECT ?, artifact_id, ?, problem, principles, '',
+      '', ?, ?
     FROM artifact_versions
     WHERE artifact_id = ? AND version = ?
   `);
