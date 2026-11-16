@@ -1,70 +1,56 @@
 # 超体 · 我的成长操作系统
 
-一个只在本机 `127.0.0.1` 运行的个人学习网站。它把课程内容连接到个人回答、行动计划、Artifact、实践与复盘。私人记录只保存在项目内 SQLite，不调用外部 AI。
+Windows 本机个人学习网站，地址为 <http://127.0.0.1:3001>，固定所有者 `owner-local`。课程连接个人回答、行动计划、实践成果卡、实践和复盘。私人记录保存在项目内 SQLite，网站运行时不调用外部 AI。
 
-代码仓库：<https://github.com/zhipeng-yu/Harness-AI>
+18章目录中第1—11章已发布，其余7章为 `awaiting_audio`。第1—11章已沿完整原材料逐章删减整理，保留案例、推理和练习要求。制作方法统一维护在 [内容工作流](docs/content-workflow.md)，各章材料对应与疑点见 `docs/chapter-*-review.md`。
 
-当前已有 18 章目录，前 11 章已经用户审批并发布，其余 7 章为 `awaiting_audio`。第 5–11 章依次讨论 AI 原生软件、上下文管理、现实校准、契约体系、意图建模、现实碰撞与端到端回路；音频依据和整理边界见 [第 5–11 章内容说明](docs/chapter-05-11-review.md)。
+阅读页按内容自然分页，支持目录、按钮和方向键翻页，末页显示本章练习并进入实践区。正文完整显示，窄窗口单栏，当前页码不持久化。
 
-第 3–11 章按各自音频重写为连续阅读稿：每页先给出清楚的结论，再用原课案例和推演讲透；从问题走向方法与行动，读完能记住本章的工作顺序。页数随内容自然变化，不设统一页数或字数；正文保持讲课语气，不插入编辑者的核验或免责提示。原音频依据与视觉缺口保存在各章内容说明中，不打断阅读。
+实践成果卡分两次填写。实践前记录目标、执行计划与成功标准，开始后锁定计划，结束后填写结果、收获与调整。下一版沿用计划和调整说明，旧行动设计、补充内容与版本历史保留。
 
-课程采用分页阅读：每页讲清一个完整意思，正文完整显示，灰度方法示意为辅，高度随内容展开，窄窗口自动变为单栏。支持目录跳转、按钮和方向键翻页，最后一页进入反思、行动与 Artifact 工作区；当前阅读页不持久化。
+## 安装与启停
 
-Artifact 在章节页中称为“实践成果卡”，分两次填写：实践前填写目标、执行计划与成功标准；开始实践后锁定计划，结束后再填写实际结果、收获与调整。下一版沿用计划并带入调整说明，不复制上一轮实践记录；旧行动设计、补充内容与版本历史完整保留。
-
-## 安装与使用
-
-需要 Windows、PowerShell 和 Node.js 24+。所有依赖只安装在项目内：
+需要 Windows、PowerShell 和 Node.js 24+，依赖安装在项目内。
 
 ```powershell
 npm.cmd install
 npm.cmd run db:migrate
 ```
 
-日常双击 `scripts\Start-Harness.cmd` 启动，双击 `scripts\Stop-Harness.cmd` 停止。网站地址是 <http://127.0.0.1:3001>。启动器使用 Next.js 开发服务器，便于本机内容更新后直接生效。
+双击 `scripts\Start-Harness.cmd` 启动，双击 `scripts\Stop-Harness.cmd` 停止。启动器使用开发服务器，内容修改可直接生效。重复启动复用本项目实例，停止时核对 PID 和启动时间。端口被其他程序占用时会提示其 PID，同一项目只运行一个服务器。
 
-重复点击启动会直接打开已有网站，并补回缺失的进程记录；停止时核对 PID 和启动时间，再结束整个 Next.js 进程树。若 3001 被其他程序占用，启动器会提示其 PID，需先关闭该程序。同一项目只能运行一个开发服务器。启动进程退出时，可运行 `npm.cmd run dev` 查看具体错误。
-
-也可以在终端运行：
+也可以运行对应 PowerShell 脚本。
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Start-Harness.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Stop-Harness.ps1
 ```
 
+启动退出时可用 `npm.cmd run dev` 查看错误。
+
 ## 数据与备份
 
-- 私人数据：`data/harness.sqlite`
-- 备份：`backups/*.sqlite`
-- 课程内容：`content/`
-- 课程插画：`public/illustrations/`
-- 临时运行记录：`.runtime/server.json`
+私人数据在 `data/harness.sqlite`，备份在 `backups/`，正式课程在 `content/`，插画在 `public/illustrations/`，运行记录在 `.runtime/`。
 
-发布课程或修改数据库结构前，先停止网站并备份：
+发布课程或修改数据库结构前停止网站并备份。
 
 ```powershell
 npm.cmd run db:backup
 ```
 
-必要时从项目内备份恢复：
+恢复仅使用项目内已验证的备份，显式提供确认参数。
 
 ```powershell
 npm.cmd run db:restore -- backups/harness-YYYYMMDD-HHMMSS.sqlite --confirm
 ```
 
-恢复会验证 SQLite 完整性，并在覆盖现有目标前再做一次备份。不要手动移动 SQLite 的 `-wal`、`-shm` 文件。
+恢复会验证完整性并先备份当前目标。数据库、已有备份及 SQLite 附属文件的保护规则见 [AGENTS.md](AGENTS.md)。路由、页面与构建验证前先将 `HARNESS_DB_PATH` 绑定项目内临时数据库。
 
-## 课程制作
+## 本机课程材料
 
-每章流程：接收完整音频、内部转录、梳理一条连续推演主线、用原课案例写成可沉浸阅读的页面、内部核对、用户审批、备份、发布。页数由内容决定；临时转录稿和原音频不进入网站或 Git。详细规则见 [内容工作流](docs/content-workflow.md)。
+第1—11章现成转录位于 `artifacts/share/Harness-AI课程第1-11章文本.zip`。离线工具和模型位于 `.tools/faster-whisper/`、`.tools/whisper-models/`。音频、转录、数据库、备份与运行文件均排除 Git。
 
-本机已有离线转写库 `.tools/faster-whisper/` 和模型 `.tools/whisper-models/`，优先复用；这些工具及 `artifacts/` 均被 Git 忽略，审阅页只在本机存在。
-
-本机 `artifacts/share/Harness-AI课程第1-11章文本.zip` 是可对外阅读的文本包：第 1–11 章均为带准确性说明的离线自动转录稿；文件不进入 Git。
-
-## 校园公益分享
-
-本机 `artifacts/presentations/harness-ai-campus-sharing/` 保存一套基于第 1–11 章整理的 40 分钟线下分享材料：22 页 PPTX（前 20 页主讲、后 2 页附录）和一页 A4《AI 协作任务卡》的 DOCX、PDF。材料面向无 AI 基础的大四学生，使用四步协作回路与六字段任务卡；不包含原音频、逐字稿或私人数据，不作为课程官方课件。
+`artifacts/presentations/harness-ai-campus-sharing/` 保存已有40分钟校园分享材料，包括22页 PPTX 和 A4《AI 协作任务卡》的 DOCX、PDF，面向无 AI 基础的大四学生。
 
 ## 开发验证
 
@@ -75,10 +61,4 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-项目不包含浏览器 E2E 测试。自动测试只覆盖内容契约、数据持久化和核心交互。
-
-## 当前不做
-
-登录、多用户共享、远程访问、部署、运行时 AI、CMS、文件上传、提醒、积分、排行和社区。未来若分享给不超过 20 人，再单独设计数据隔离；现在不提前实现。
-
-每次完成任务后更新本文件和 `HANDOFF.md`，并将验证通过的改动直接推送到 `main`。
+自动检查覆盖内容契约、持久化和核心交互，实际阅读页另做浏览器检查。完成任务后同步本文件与 [HANDOFF.md](HANDOFF.md)，验证通过后直接提交并推送远端 `main`。仓库为 <https://github.com/zhipeng-yu/Harness-AI>。

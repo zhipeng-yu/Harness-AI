@@ -60,7 +60,8 @@ describe("ChapterWorkspace", () => {
       ...chapter.explanation.map(item => item.body),
     ]) expect(displayed).toContain(text);
     expect(slides.filter(slide => slide.eyebrow === "深入理解")).toHaveLength(chapter.explanation.length);
-    if (chapter.order >= 3) expect(slides).toHaveLength(chapter.explanation.length + 2);
+    expect(slides).toHaveLength(chapter.explanation.length + 2);
+    expect(slides.at(-1)?.title).toBe(chapter.artifactTemplate.title);
   });
 
   it.each([chapter01, chapter04])("jumps to a complete article and enters practice from the last page in $id", (chapter) => {
@@ -80,15 +81,14 @@ describe("ChapterWorkspace", () => {
     expect(onEnterPractice).toHaveBeenCalledOnce();
   });
 
-  it("publishes chapter 02 with its own visuals and scenarios", () => {
+  it("publishes chapter 02 with its own visuals and continuous explanation", () => {
     expect(chapterSchema.safeParse(chapter02).success).toBe(true);
     expect(getChapterBySlug("chapter-02")?.status).toBe("published");
     render(<ChapterDeck chapter={chapter02} onEnterPractice={vi.fn()} />);
     expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-02/");
     const next = screen.getByRole("button", { name: /下一页/ });
-    const scenarioIndex = buildChapterSlides(chapter02).findIndex(slide => slide.eyebrow === "落到日常");
-    for (let index = 0; index < scenarioIndex; index += 1) fireEvent.click(next);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("把协作语感用在真实任务中");
+    fireEvent.click(next);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(chapter02.explanation[0].heading);
     expect(screen.getByRole("img").getAttribute("src")).toContain("/chapter-02/");
   });
 
@@ -156,11 +156,11 @@ describe("ChapterWorkspace", () => {
 
     fireEvent.keyDown(window, { key: "ArrowRight" });
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(publishedChapterFixture.coreStructure[0].title);
-    expect(screen.getByText("2 / 8")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(publishedChapterFixture.explanation[0].heading);
+    expect(screen.getByText("2 / 3")).toBeInTheDocument();
   });
 
-  it("pages through concepts, scenarios and misconceptions", () => {
+  it("pages from explanation to the complete action question", () => {
     render(
       <ChapterWorkspace
         chapter={publishedChapterFixture}
@@ -172,14 +172,13 @@ describe("ChapterWorkspace", () => {
     );
 
     const next = screen.getByRole("button", { name: /下一页/ });
-    for (let index = 0; index < 4; index += 1) fireEvent.click(next);
-
-    expect(screen.getByText(publishedChapterFixture.concepts[0].term)).toBeInTheDocument();
+    fireEvent.click(next);
+    expect(screen.getByText(publishedChapterFixture.explanation[0].body)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "展开完整讲义" })).not.toBeInTheDocument();
     fireEvent.click(next);
-    expect(screen.getByText(publishedChapterFixture.scenarios[0])).toBeInTheDocument();
-    fireEvent.click(next);
-    expect(screen.getByText(publishedChapterFixture.misconceptions[0])).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(publishedChapterFixture.artifactTemplate.title);
+    expect(screen.getAllByText(publishedChapterFixture.actionPrompt.question)).toHaveLength(2);
+    expect(next).toBeDisabled();
   });
 
   it("binds stable course prompt and field ids to the fixed forms", () => {

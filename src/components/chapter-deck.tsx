@@ -92,7 +92,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
   const isChapter03 = chapter.id === "chapter-03";
   const isChapter04 = chapter.id === "chapter-04";
   const isChapter05To11 = chapter.order >= 5 && chapter.order <= 11;
-  const narrativeOnly = chapter.order >= 3 && chapter.order <= 11;
+  const narrativeOnly = chapter.order >= 1 && chapter.order <= 11;
   const coreSlides = chapter.coreStructure.map((item, index) => ({
     eyebrow: `阅读路线 · ${String(index + 1).padStart(2, "0")}`,
     title: item.title,
@@ -127,7 +127,7 @@ export function buildChapterSlides(chapter: PublishedChapter): readonly ChapterS
     };
   const closing = {
       eyebrow: "从理解到行动",
-      title: "让新能力与现实发生接触",
+      title: chapter.artifactTemplate.title,
       lead: chapter.actionPrompt.question,
       visual: isChapter05To11 ? 1 : isChapter04 ? 1 : isChapter03 ? 2 : isChapter02 ? 3 : 7,
       closing: true,
